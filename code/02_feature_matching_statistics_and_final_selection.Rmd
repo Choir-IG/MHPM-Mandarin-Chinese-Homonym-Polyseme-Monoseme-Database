@@ -1,0 +1,2483 @@
+﻿---
+title: "Context POS Data Processing Steps 02-08"
+output: html_document
+---
+
+This organized R Markdown file migrates the Step 02-08 data-processing code in execution order. Replace every `CHANGE_THIS_TO_YOUR_PATH` placeholder before running.
+
+## Step 02: Save the 91 Whitelisted Raw Features
+
+Read the cleaned homonym, polyseme, and monoseme tables; keep the metadata columns plus the 91 feature whitelist; write the raw feature-filtered files.
+
+```{r step_02}
+RAW_HOM  <- "CHANGE_THIS_TO_YOUR_PATH/01_organization/homonym_pos_sense_example_cleaned.xlsx"
+RAW_POLY <- "CHANGE_THIS_TO_YOUR_PATH/01_organization/polyseme_pos_sense_example_cleaned.xlsx"
+RAW_MONO <- "CHANGE_THIS_TO_YOUR_PATH/01_organization/monoseme_pos_sense_example_cleaned.xlsx"
+
+OUT_DIR  <- "CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved"
+dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+
+OUT_HOM  <- file.path(OUT_DIR, "homonym_pos_sense_features_91saved_filtered.xlsx")
+OUT_MONO <- file.path(OUT_DIR, "monoseme_pos_sense_features_91saved_filtered.xlsx")
+OUT_POLY <- file.path(OUT_DIR, "polyseme_pos_sense_features_91saved_filtered.xlsx")
+
+# Processing step.
+# install.packages(c("readxl", "openxlsx", "dplyr", "stringr"))
+library(readxl)
+library(openxlsx)
+library(dplyr)
+library(stringr)
+
+# Feature whitelist and feature-column handling.
+FEATURES_KEEP <- c(
+  "ValenceArousal_Valence_Mean","ValenceArousal_Valence_SD",
+  "ValenceArousal_Arousal_Mean","ValenceArousal_Arousal_SD",
+  "ValenceArousal_Men_Valence_Mean","ValenceArousal_Men_Valence_SD",
+  "ValenceArousal_Women_Valence_Mean","ValenceArousal_Women_Valence_SD",
+  "ValenceArousal_Men_Arousal_Mean","ValenceArousal_Men_Arousal_SD",
+  "ValenceArousal_Women_Arousal_Mean","ValenceArousal_Women_Arousal_SD",
+  "SUBTLEXWord_WCount","SUBTLEXWord_W/million","SUBTLEXWord_logW",
+  "SUBTLEXWord_W-CD","SUBTLEXWord_W-CD%","SUBTLEXWord_logW-CD",
+  "MELD_RT","MELD_RTSD","MELD_zRT","MELD_zRTSD","MELD_ERR",
+  "Concreteness_Mean of Valid Ratings","Concreteness_SD of Valid Ratings",
+  "CLD_Phonemes","CLD_Frequency","CLD_C1Frequency","CLD_C2Frequency",
+  "CLD_FrequencyRaw","CLD_C1FrequencyRaw","CLD_C2FrequencyRaw",
+  "CLD_FrequencyWeibo","CLD_C1FrequencyWeibo","CLD_C2FrequencyWeibo",
+  "CLD_FrequencyRawWeibo","CLD_C1FrequencyRawWeibo","CLD_C2FrequencyRawWeibo",
+  "CLD_PhonologicalFrequency","CLD_C1PhonologicalFrequency","CLD_C2PhonologicalFrequency",
+  "CLD_C1FamilySize","CLD_C2FamilySize","CLD_C1FamilyFrequency","CLD_C2FamilyFrequency",
+  "CLD_Strokes","CLD_C1Strokes","CLD_C2Strokes","CLD_C1Pixels","CLD_C2Pixels",
+  "CLD_C1PictureSize","CLD_C2PictureSize","CLD_C1OLDPixels","CLD_C2OLDPixels",
+  "CLD_PhonologicalN","CLD_C1PhonologicalN","CLD_C2PhonologicalN",
+  "CLD_PLD","CLD_C1PLD","CLD_C2PLD",
+  "CLD_MeanPhonemeFrequency","CLD_C1MeanPhonemeFrequency","CLD_C2MeanPhonemeFrequency",
+  "CLD_MinPhonemeFrequency","CLD_C1MinPhonemeFrequency","CLD_C2MinPhonemeFrequency",
+  "CLD_MaxPhonemeFrequency","CLD_C1MaxPhonemeFrequency","CLD_C2MaxPhonemeFrequency",
+  "CLD_C1InitialPhonemeFrequency","CLD_C2InitialPhonemeFrequency",
+  "CLD_MeanDiphoneFrequency","CLD_MinDiphoneFrequency","CLD_MaxDiphoneFrequency",
+  "CLD_C1Friends","CLD_C2Friends","CLD_C1HomographTokens","CLD_C2HomographTokens",
+  "CLD_C1FriendsFrequency","CLD_C2FriendsFrequency",
+  "CLD_C1HomophonesFrequency","CLD_C2HomophonesFrequency",
+  "CLD_C1Entropy","CLD_C1BackwardEntropy",
+  "CLD_PMI","CLD_PSPMI","CLD_TScore","CLD_PSTScore",
+  "CLD_C1ConditionalProbability","CLD_C1BackwardConditionalProbability",
+  "CLD_EntropyCharacterFrequencies"
+)
+
+# Processing step.
+# Processing step.
+H_COL_INDEX <- 8
+
+# Processing step.
+filter_keep_front_and_whitelist_after_H <- function(path_in, path_out, features_keep, h_col_index) {
+  message("Reading file: ", path_in)
+  df <- read_xlsx(path_in)
+
+  all_cols <- names(df)
+  n_cols   <- length(all_cols)
+
+  if (h_col_index > n_cols) {
+    stop("H_COL_INDEX exceeds the number of columns. Please check whether it is really the H-column index.")
+  }
+
+  # Processing step.
+  left_cols <- all_cols[1:(h_col_index-1)]
+
+  # Processing step.
+  right_candidate_cols <- all_cols[h_col_index:n_cols]
+
+  # Processing step.
+  norm_key <- function(x) gsub("\\s+", "", tolower(x))
+
+  right_keep <- right_candidate_cols[
+    norm_key(right_candidate_cols) %in% norm_key(features_keep)
+  ]
+
+  # Processing step.
+  final_cols <- c(left_cols, right_keep)
+
+  # Processing step.
+  df_out <- df[, final_cols, drop = FALSE]
+
+  # Processing step.
+  message("total columns: ", n_cols,
+          " | columns kept before H: ", length(left_cols),
+          " | whitelist feature columns from H onward: ", length(right_keep),
+          " | final output columns: ", length(final_cols))
+
+  # Processing step.
+  missing_in_this_file <- setdiff(
+    features_keep,
+    right_candidate_cols[ norm_key(right_candidate_cols) %in% norm_key(features_keep) ]
+  )
+  if (length(missing_in_this_file) > 0) {
+    message("Warning: the following whitelist features were not found in this file or after the H-column boundary:")
+    message(paste("  -", missing_in_this_file, collapse = "\n"))
+  }
+
+  message("Writing file: ", path_out)
+  write.xlsx(df_out, path_out, overwrite = TRUE)
+
+  invisible(df_out)
+}
+
+# Candidate-set preparation.
+hom_filtered  <- filter_keep_front_and_whitelist_after_H(
+  path_in      = RAW_HOM,
+  path_out     = OUT_HOM,
+  features_keep= FEATURES_KEEP,
+  h_col_index  = H_COL_INDEX
+)
+
+mono_filtered <- filter_keep_front_and_whitelist_after_H(
+  path_in      = RAW_MONO,
+  path_out     = OUT_MONO,
+  features_keep= FEATURES_KEEP,
+  h_col_index  = H_COL_INDEX
+)
+
+poly_filtered <- filter_keep_front_and_whitelist_after_H(
+  path_in      = RAW_POLY,
+  path_out     = OUT_POLY,
+  features_keep= FEATURES_KEEP,
+  h_col_index  = H_COL_INDEX
+)
+
+message("Completed. Output directory: ", OUT_DIR)
+```
+
+Expected output:
+- `CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/homonym_pos_sense_features_91saved_filtered.xlsx`
+- `CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/polyseme_pos_sense_features_91saved_filtered.xlsx`
+- `CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/monoseme_pos_sense_features_91saved_filtered.xlsx`
+
+## Step 03: Normalize the 91 Features by Headword
+
+For each lexical group, deduplicate by headword, compute z-scores on the feature columns, and restore the normalized values to the original row shape.
+
+```{r step_03}
+FILE_HOM  <- "CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/homonym_pos_sense_features_91saved_filtered.xlsx"
+FILE_POLY <- "CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/polyseme_pos_sense_features_91saved_filtered.xlsx"
+FILE_MONO <- "CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/monoseme_pos_sense_features_91saved_filtered.xlsx"
+
+OUT_DIR   <- "CHANGE_THIS_TO_YOUR_PATH/03_normaliation_91"
+dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+
+
+# install.packages(c("readxl","openxlsx","dplyr","readr","stringr"))
+library(readxl)
+library(openxlsx)
+library(dplyr)
+library(readr)
+library(stringr)
+
+H_COL_INDEX <- 8
+
+# Processing step.
+
+# Processing step.
+read_any <- function(path){
+  if (grepl("\\.xlsx?$", path, ignore.case = TRUE)) {
+    read_xlsx(path)
+  } else if (grepl("\\.csv$", path, ignore.case = TRUE)) {
+    read_csv(path, show_col_types = FALSE)
+  } else {
+    stop("Only .xlsx or .csv files are supported: ", path)
+  }
+}
+
+# Processing step.
+to_numeric_soft <- function(v){
+  if (is.numeric(v)) return(v)
+  if (is.character(v)){
+    v2 <- gsub("[,\\s]", "", v)
+    return(suppressWarnings(as.numeric(v2)))
+  }
+  suppressWarnings(as.numeric(v))
+}
+
+# Z-score normalization.
+zscore_vector <- function(x){
+  mu  <- mean(x, na.rm = TRUE)
+  sdv <- sd(x, na.rm = TRUE)
+  if (is.na(sdv) || sdv == 0) {
+    return(ifelse(is.na(x), NA_real_, 0))
+  } else {
+    return((x - mu) / sdv)
+  }
+}
+
+# Processing step.
+round_numeric_cols <- function(df, digits = 5){
+  df %>%
+    mutate(across(where(is.numeric), ~ round(.x, digits)))
+}
+
+# Processing step.
+process_one_file <- function(in_path, out_dir, h_col_index = H_COL_INDEX){
+
+  message("Processing file: ", in_path)
+  df_raw <- read_any(in_path)
+
+  # Processing step.
+  original_cols <- names(df_raw)
+
+  # Processing step.
+  col_head <- if ("headword" %in% names(df_raw)) {
+    "headword"
+  } else {
+    nm <- names(df_raw)
+    hit <- nm[trimws(tolower(nm)) == "headword"]
+    if (length(hit) == 0) stop("Could not find the headword column: ", in_path)
+    hit[1]
+  }
+
+  # Processing step.
+  if (h_col_index > ncol(df_raw)) {
+    stop("This file has fewer columns than H_COL_INDEX specifies: ", in_path,
+         "\ncurrent column count=", ncol(df_raw), ", H_COL_INDEX=", h_col_index)
+  }
+
+  meta_cols_idx    <- 1:(h_col_index - 1)      # A..(H-1)
+  feature_cols_idx <- h_col_index:ncol(df_raw) # H..end
+  meta_cols        <- names(df_raw)[meta_cols_idx]
+  feature_cols     <- names(df_raw)[feature_cols_idx]
+
+  # Processing step.
+  df_num <- df_raw
+  for (nm in feature_cols) {
+    df_num[[nm]] <- to_numeric_soft(df_num[[nm]])
+  }
+
+  # Processing step.
+  df_unique <- df_num %>%
+    distinct(.data[[col_head]], .keep_all = TRUE)
+
+  # Z-score normalization.
+  df_unique_norm <- df_unique
+  df_unique_norm[feature_cols] <- lapply(df_unique[feature_cols], zscore_vector)
+
+  # Processing step.
+  key_norm <- df_unique_norm[, c(col_head, feature_cols), drop = FALSE]
+
+  idx <- match(df_raw[[col_head]], key_norm[[col_head]])
+  df_joined <- df_raw
+  for (nm in feature_cols) {
+    df_joined[[nm]] <- key_norm[[nm]][idx]
+  }
+
+  # Processing step.
+  df_joined <- df_joined[, original_cols, drop = FALSE]
+
+  # Processing step.
+  df_joined_rounded     <- round_numeric_cols(df_joined,     digits = 5)
+  df_unique_norm_rounded<- round_numeric_cols(df_unique_norm, digits = 5)
+
+  # Processing step.
+  out_name <- sub("\\.(xlsx|csv)$", "", basename(in_path), ignore.case = TRUE)
+  out_path <- file.path(out_dir, paste0(out_name, "_normalized_z.xlsx"))
+
+  wb <- createWorkbook()
+  addWorksheet(wb, "normalized_z_restored_shape")
+  addWorksheet(wb, "deduplicated_used_for_scaling")
+  addWorksheet(wb, "info")
+
+  # Z-score normalization.
+  writeData(wb, "normalized_z_restored_shape", df_joined_rounded)
+
+  # Z-score normalization.
+  writeData(wb, "deduplicated_used_for_scaling", df_unique_norm_rounded)
+
+  # Processing step.
+  writeData(
+    wb,
+    "info",
+    data.frame(
+      file = in_path,
+      headword_col = col_head,
+      meta_cols_unchanged_start = 1,
+      meta_cols_unchanged_end   = h_col_index - 1,
+      normalized_cols_start_idx = h_col_index,
+      normalized_cols_end_idx   = ncol(df_raw),
+      normalized_cols_start_name= names(df_raw)[h_col_index],
+      normalized_cols_end_name  = names(df_raw)[ncol(df_raw)],
+      n_rows_original           = nrow(df_raw),
+      n_rows_deduplicated       = nrow(df_unique),
+      n_features_normalized     = length(feature_cols)
+    )
+  )
+
+  saveWorkbook(wb, out_path, overwrite = TRUE)
+  message("Output written: ", out_path)
+
+  invisible(out_path)
+}
+
+# Processing step.
+process_one_file(FILE_HOM,  OUT_DIR, H_COL_INDEX)
+process_one_file(FILE_MONO, OUT_DIR, H_COL_INDEX)
+process_one_file(FILE_POLY, OUT_DIR, H_COL_INDEX)
+
+message("All files completed.")
+```
+
+Expected output:
+- `CHANGE_THIS_TO_YOUR_PATH/03_normaliation_91/*_normalized_z.xlsx`
+
+## Step 04: Select Top-k Cosine-Similarity Candidates
+
+Use normalized 91-feature vectors to retrieve top-5 polyseme and monoseme candidates for each homonym, then enforce unique assignments using gap-based conflict resolution.
+
+```{r step_04}
+NORM_HOM  <- "CHANGE_THIS_TO_YOUR_PATH/03_normaliation_91/homonym_pos_sense_features_91saved_filtered_normalized_z.xlsx"
+NORM_POLY <- "CHANGE_THIS_TO_YOUR_PATH/03_normaliation_91/polyseme_pos_sense_features_91saved_filtered_normalized_z.xlsx"
+NORM_MONO <- "CHANGE_THIS_TO_YOUR_PATH/03_normaliation_91/monoseme_pos_sense_features_91saved_filtered_normalized_z.xlsx"
+
+OUT_DIR  <- "CHANGE_THIS_TO_YOUR_PATH/04_cosine_similarity"
+OUT_XLSX <- file.path(OUT_DIR, "similarity_topk_cosine_unique_assign_latestNorm.xlsx")
+
+dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+
+##############################################
+# Processing step.
+##############################################
+# install.packages(c("readxl","openxlsx","dplyr","tibble","purrr"))
+library(readxl)
+library(openxlsx)
+library(dplyr)
+library(tibble)
+library(purrr)
+
+##############################################
+# Processing step.
+##############################################
+TOPK <- 5
+COL_HEADWORD <- "headword"
+H_COL_INDEX <- 8  # Processing step.
+
+##############################################
+# Processing step.
+##############################################
+
+read_norm_sheet <- function(path, sheet_name = "normalized_z_restored_shape") {
+  read_xlsx(path, sheet = sheet_name)
+}
+
+extract_feature_matrix <- function(df, headword_col = COL_HEADWORD, h_col_index = H_COL_INDEX) {
+
+  # Processing step.
+  if (!(headword_col %in% names(df))) {
+    nm <- names(df)
+    hit <- nm[ trimws(tolower(nm)) == "headword" ]
+    if (length(hit) == 0) stop("Could not find the headword column in file: ", headword_col)
+    headword_col <- hit[1]
+  }
+
+  if (h_col_index > ncol(df)) {
+    stop("The file has fewer columns than H_COL_INDEX; check whether H_COL_INDEX is correct.")
+  }
+
+  feature_cols  <- names(df)[h_col_index:ncol(df)]
+
+  # Processing step.
+  df_head_feats <- df[, c(headword_col, feature_cols), drop = FALSE] %>%
+    distinct(.data[[headword_col]], .keep_all = TRUE)
+
+  # Processing step.
+  names(df_head_feats)[1] <- "headword"
+
+  # Processing step.
+  for (j in 2:ncol(df_head_feats)) {
+    if (!is.numeric(df_head_feats[[j]])) {
+      suppressWarnings({
+        df_head_feats[[j]] <- as.numeric(df_head_feats[[j]])
+      })
+    }
+  }
+
+  # Processing step.
+  impute_col_median <- function(M){
+    for (j in seq_len(ncol(M))) {
+      x <- M[, j]
+      if (anyNA(x)) {
+        med <- suppressWarnings(stats::median(x, na.rm = TRUE))
+        if (is.na(med) || is.infinite(med)) med <- 0
+        x[is.na(x)] <- med
+        M[, j] <- x
+      }
+    }
+    M
+  }
+
+  feat_only_mat <- as.matrix(df_head_feats[, -1, drop = FALSE])
+  feat_only_mat <- impute_col_median(feat_only_mat)
+
+  list(
+    ids = df_head_feats$headword,
+    mat = feat_only_mat
+  )
+}
+
+cosine_sim <- function(A, B){
+  A <- as.matrix(A); B <- as.matrix(B)
+  An <- sqrt(rowSums(A*A)); Bn <- sqrt(rowSums(B*B))
+  An[An==0] <- 1e-12; Bn[Bn==0] <- 1e-12
+  (A %*% t(B)) / (An %o% Bn)
+}
+
+topk_from_sim <- function(sim_mat, q_ids, c_ids, k = TOPK){
+  res <- lapply(seq_len(nrow(sim_mat)), function(i){
+    s <- sim_mat[i, ]
+    ord <- order(s, decreasing = TRUE)
+    kk <- min(k, length(ord))
+    tibble(
+      query      = q_ids[i],
+      rank       = seq_len(kk),
+      candidate  = c_ids[ord[seq_len(kk)]],
+      similarity = s[ord[seq_len(kk)]]
+    )
+  })
+  bind_rows(res)
+}
+
+##########################################################
+# Gap-based conflict resolution and uniqueness handling.
+##########################################################
+
+calc_gap_for_choice <- function(tk_rows, r){
+  cur_sim  <- tk_rows$similarity[ tk_rows$rank == r   ]
+  next_sim <- tk_rows$similarity[ tk_rows$rank == r+1 ]
+  if (length(cur_sim) == 0) return(NA_real_)
+  if (length(next_sim) == 0) return(Inf)
+  cur_sim - next_sim
+}
+
+##########################################################
+# Processing step.
+# Gap-based conflict resolution and uniqueness handling.
+# Processing step.
+##########################################################
+
+resolve_conflicts_greedy_gap <- function(topk_tbl, max_rank = TOPK){
+
+  queries <- unique(topk_tbl$query)
+
+  # Processing step.
+  state <- tibble(
+    query = queries,
+    current_rank_attempt = 1L,  # Processing step.
+    assigned_candidate = NA_character_,  # Processing step.
+    assigned_similarity = NA_real_,
+    assigned_rank       = NA_integer_,
+    status              = NA_character_   # primary / fallback / special/no
+  )
+
+  # Processing step.
+  used_candidates <- character(0)
+
+  still_need_assignment <- function(st){
+    st %>%
+      filter(is.na(assigned_candidate),
+             current_rank_attempt <= max_rank)
+  }
+
+  repeat {
+    seekers <- still_need_assignment(state)
+    if (nrow(seekers) == 0) break
+
+    # Processing step.
+    wish_list_rows <- vector("list", nrow(seekers))
+    idx <- 0L
+
+    for (i in seq_len(nrow(seekers))) {
+      q <- seekers$query[i]
+      r <- seekers$current_rank_attempt[i]
+
+      tk_rows <- topk_tbl %>% filter(query == q)
+      cand_row <- tk_rows %>% filter(rank == r)
+
+      # Processing step.
+      if (nrow(cand_row) == 0) {
+        state$current_rank_attempt[state$query == q] <- r + 1L
+        next
+      }
+
+      cand <- cand_row$candidate[1]
+      simv <- cand_row$similarity[1]
+
+      # Processing step.
+      if (cand %in% used_candidates) {
+        state$current_rank_attempt[state$query == q] <- r + 1L
+        next
+      }
+
+      g <- calc_gap_for_choice(tk_rows, r)
+
+      idx <- idx + 1L
+      wish_list_rows[[idx]] <- tibble(
+        query           = q,
+        want_rank       = r,
+        want_candidate  = cand,
+        want_similarity = simv,
+        gap             = g
+      )
+    }
+
+    # Processing step.
+    if (idx == 0L) next
+
+    wish_list <- bind_rows(wish_list_rows[seq_len(idx)])
+
+    # Processing step.
+    # Gap-based conflict resolution and uniqueness handling.
+    resolutions <- wish_list %>%
+      group_by(want_candidate) %>%
+      arrange(desc(gap), desc(want_similarity), .by_group = TRUE) %>%
+      slice(1) %>%
+      ungroup() %>%
+      mutate(winner_query = query)
+
+    # Processing step.
+    wish_list_with_winner <- wish_list %>%
+      left_join(resolutions %>% select(want_candidate, winner_query),
+                by = "want_candidate") %>%
+      mutate(win_flag = (query == winner_query))
+
+    winners_tbl <- wish_list_with_winner %>%
+      filter(win_flag) %>%
+      select(query,
+             assigned_candidate  = want_candidate,
+             assigned_similarity = want_similarity,
+             assigned_rank       = want_rank)
+
+    losers_tbl <- wish_list_with_winner %>%
+      filter(!win_flag) %>%
+      select(query, want_rank)
+
+    # Processing step.
+    if (nrow(losers_tbl) > 0) {
+      for (i in seq_len(nrow(losers_tbl))) {
+        q_i <- losers_tbl$query[i]
+        r_i <- losers_tbl$want_rank[i]
+        state$current_rank_attempt[state$query == q_i] <-
+          pmin(max_rank + 1L, r_i + 1L)
+      }
+    }
+
+    # Processing step.
+    if (nrow(winners_tbl) > 0) {
+      for (i in seq_len(nrow(winners_tbl))) {
+        q_i  <- winners_tbl$query[i]
+        cand <- winners_tbl$assigned_candidate[i]
+        simv <- winners_tbl$assigned_similarity[i]
+        rk   <- winners_tbl$assigned_rank[i]
+
+        state$assigned_candidate[state$query == q_i]  <- cand
+        state$assigned_similarity[state$query == q_i] <- simv
+        state$assigned_rank[state$query == q_i]       <- rk
+
+        used_candidates <- c(used_candidates, cand)
+      }
+    }
+  }
+
+  # Processing step.
+  state <- state %>%
+    mutate(
+      status = dplyr::case_when(
+        !is.na(assigned_candidate) & assigned_rank == 1L ~ "primary",
+        !is.na(assigned_candidate) & assigned_rank > 1L  ~ "fallback",
+        TRUE                                             ~ "special/no"
+      )
+    )
+
+  state
+}
+
+##############################################
+# Processing step.
+##############################################
+
+# Processing step.
+hom_df  <- read_norm_sheet(NORM_HOM,  sheet_name = "normalized_z_restored_shape")
+poly_df <- read_norm_sheet(NORM_POLY, sheet_name = "normalized_z_restored_shape")
+mono_df <- read_norm_sheet(NORM_MONO, sheet_name = "normalized_z_restored_shape")
+
+# Processing step.
+hom_info  <- extract_feature_matrix(hom_df,  headword_col = COL_HEADWORD, h_col_index = H_COL_INDEX)
+poly_info <- extract_feature_matrix(poly_df, headword_col = COL_HEADWORD, h_col_index = H_COL_INDEX)
+mono_info <- extract_feature_matrix(mono_df, headword_col = COL_HEADWORD, h_col_index = H_COL_INDEX)
+
+# Processing step.
+common_feats <- Reduce(intersect, list(
+  colnames(hom_info$mat),
+  colnames(poly_info$mat),
+  colnames(mono_info$mat)
+))
+if (length(common_feats) == 0) {
+  stop("The three normalized files have no shared feature columns after the H-column boundary.")
+}
+
+hom_mat  <- hom_info$mat[,  common_feats, drop = FALSE]
+poly_mat <- poly_info$mat[, common_feats, drop = FALSE]
+mono_mat <- mono_info$mat[, common_feats, drop = FALSE]
+
+idH <- hom_info$ids
+idP <- poly_info$ids
+idM <- mono_info$ids
+
+# Cosine similarity and candidate ranking.
+cos_hp <- cosine_sim(hom_mat, poly_mat)  # homonym vs polyseme
+cos_hm <- cosine_sim(hom_mat, mono_mat)  # homonym vs monoseme
+
+# Candidate-set preparation.
+cos_topk_poly <- topk_from_sim(cos_hp, idH, idP, k = TOPK)
+cos_topk_mono <- topk_from_sim(cos_hm, idH, idM, k = TOPK)
+
+# Gap-based conflict resolution and uniqueness handling.
+poly_assignment_unique <- resolve_conflicts_greedy_gap(cos_topk_poly, max_rank = TOPK)
+mono_assignment_unique <- resolve_conflicts_greedy_gap(cos_topk_mono, max_rank = TOPK)
+
+##############################################
+# Processing step.
+##############################################
+
+wb <- createWorkbook()
+addWorksheet(wb, "settings")
+addWorksheet(wb, "cos_topk_poly")
+addWorksheet(wb, "cos_topk_mono")
+addWorksheet(wb, "poly_assignment_unique")
+addWorksheet(wb, "mono_assignment_unique")
+
+writeData(
+  wb, "settings",
+  tibble(
+    note = "Cosine-only, TOPK=5. Assignment uses global conflict resolution with gap-based priority (larger gap preferred) and globally unique candidates.",
+    topk = TOPK,
+    n_homonym = length(idH),
+    n_polyseme = length(idP),
+    n_monoseme = length(idM),
+    n_common_features_used = length(common_feats),
+    example_features_head = paste(head(common_feats,10), collapse = ", ")
+  )
+)
+
+writeData(wb, "cos_topk_poly", cos_topk_poly)
+writeData(wb, "cos_topk_mono", cos_topk_mono)
+writeData(wb, "poly_assignment_unique", poly_assignment_unique)
+writeData(wb, "mono_assignment_unique", mono_assignment_unique)
+
+saveWorkbook(wb, OUT_XLSX, overwrite = TRUE)
+message("Completed: ", OUT_XLSX)
+
+```
+
+Expected output:
+- `CHANGE_THIS_TO_YOUR_PATH/04_cosine_similarity/similarity_topk_cosine_unique_assign_latestNorm.xlsx`
+
+## Step 05: Validate Feature-Level Matching with Raw Welch t-tests
+
+Use the unique cosine assignments and raw 91-feature tables to run feature-wise Welch tests for homonym vs polyseme, homonym vs monoseme, and polyseme vs monoseme.
+
+```{r step_05}
+ASSIGN_XLSX <- "CHANGE_THIS_TO_YOUR_PATH/04_cosine_similarity/similarity_topk_cosine_unique_assign_latestNorm.xlsx"
+
+# Processing step.
+RAW_HOM  <- "CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/homonym_pos_sense_features_91saved_filtered.xlsx"
+RAW_POLY <- "CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/polyseme_pos_sense_features_91saved_filtered.xlsx"
+RAW_MONO <- "CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/monoseme_pos_sense_features_91saved_filtered.xlsx"
+
+OUT_DIR  <- "CHANGE_THIS_TO_YOUR_PATH/05_raw_ttest"
+OUT_XLSX <- file.path(OUT_DIR, "feature_level_ttests_hom_vs_poly_mono.xlsx")
+
+
+dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+
+
+# install.packages(c("readxl","openxlsx","dplyr","tibble","purrr"))
+library(readxl)
+library(openxlsx)
+library(dplyr)
+library(tibble)
+library(purrr)
+
+
+COL_HEADWORD <- "headword"
+H_COL_INDEX  <- 8  # Processing step.
+FDR_METHOD   <- "BH"   # Benjaminiâ€“Hochberg FDR
+# Statistical testing step.
+# Processing step.
+
+###########################
+# Processing step.
+###########################
+
+# Processing step.
+# Processing step.
+# Processing step.
+# Processing step.
+read_raw_dedup <- function(path, head_col = COL_HEADWORD, h_col_index = H_COL_INDEX) {
+  df <- read_xlsx(path)
+
+  # Processing step.
+  if (!(head_col %in% names(df))) {
+    nm  <- names(df)
+    hit <- nm[ trimws(tolower(nm)) == "headword" ]
+    if (length(hit) == 0) stop("Could not find the headword column in ", path)
+    head_col <- hit[1]
+  }
+
+  if (h_col_index > ncol(df)) {
+    stop("The file has fewer columns than H_COL_INDEX; please check H_COL_INDEX: ", path)
+  }
+
+  feature_cols <- names(df)[h_col_index:ncol(df)]
+
+  # Processing step.
+  df_dedup <- df %>%
+    distinct(.data[[head_col]], .keep_all = TRUE)
+
+  # Processing step.
+  names(df_dedup)[names(df_dedup) == head_col] <- "headword"
+
+  # Processing step.
+  for (fn in feature_cols) {
+    if (!is.numeric(df_dedup[[fn]])) {
+      suppressWarnings({
+        df_dedup[[fn]] <- as.numeric(df_dedup[[fn]])
+      })
+    }
+  }
+
+  list(
+    df = df_dedup,
+    feature_cols = feature_cols
+  )
+}
+
+# Processing step.
+#    poly_assignment_unique: homonym -> poly
+#    mono_assignment_unique: homonym -> mono
+read_assignments <- function(path_assign) {
+
+  poly_assign <- read_xlsx(path_assign, sheet = "poly_assignment_unique")
+  mono_assign <- read_xlsx(path_assign, sheet = "mono_assignment_unique")
+
+  poly_assign_clean <- poly_assign %>%
+    select(query, assigned_candidate, assigned_similarity,
+           assigned_rank, status)
+
+  mono_assign_clean <- mono_assign %>%
+    select(query, assigned_candidate, assigned_similarity,
+           assigned_rank, status)
+
+  list(
+    poly = poly_assign_clean,
+    mono = mono_assign_clean
+  )
+}
+
+# Processing step.
+# Processing step.
+# Processing step.
+# Processing step.
+# Processing step.
+# Processing step.
+# Processing step.
+# Processing step.
+prepare_pairing_data <- function(A_df, B_df, assignment_tbl, feature_cols_A, feature_cols_B) {
+
+  assign_ok <- assignment_tbl %>%
+    filter(!is.na(assigned_candidate),
+           status != "special/no") %>%
+    distinct(query, assigned_candidate, .keep_all = TRUE)
+
+  # Processing step.
+  assign_ok <- assign_ok %>%
+    semi_join(A_df %>% select(headword), by = c("query" = "headword")) %>%
+    semi_join(B_df %>% select(headword), by = c("assigned_candidate" = "headword"))
+
+  feats_common <- intersect(feature_cols_A, feature_cols_B)
+
+  list(
+    pair_table = assign_ok,
+    feature_cols_common = feats_common
+  )
+}
+
+# Statistical testing step.
+# Candidate-set preparation.
+# Candidate-set preparation.
+# Processing step.
+ttest_one_feature <- function(feature_name, pairing_info, A_df, B_df) {
+
+  pairs_tbl <- pairing_info$pair_table
+
+  # Processing step.
+  A_vals <- A_df %>%
+    select(headword, !!feature_name) %>%
+    rename(Aval = !!feature_name)
+
+  # Processing step.
+  B_vals <- B_df %>%
+    select(headword, !!feature_name) %>%
+    rename(Bval = !!feature_name)
+
+  merged <- pairs_tbl %>%
+    left_join(A_vals, by = c("query" = "headword")) %>%
+    left_join(B_vals, by = c("assigned_candidate" = "headword"))
+
+  merged2 <- merged %>%
+    filter(is.finite(Aval), is.finite(Bval))
+
+  x <- merged2$Aval
+  y <- merged2$Bval
+
+  # Processing step.
+  if (length(x) < 2 || length(y) < 2) {
+    return(tibble(
+      feature    = feature_name,
+      n_A        = length(x),
+      n_B        = length(y),
+      mean_A     = ifelse(length(x)>0, mean(x), NA_real_),
+      mean_B     = ifelse(length(y)>0, mean(y), NA_real_),
+      diff_mean  = ifelse(length(x)>0 && length(y)>0, mean(x)-mean(y), NA_real_),
+      t_stat     = NA_real_,
+      df         = NA_real_,
+      p_val      = NA_real_
+    ))
+  }
+
+  tt <- tryCatch(
+    t.test(x, y, var.equal = FALSE),  # Processing step.
+    error = function(e) NULL
+  )
+
+  if (is.null(tt)) {
+    tibble(
+      feature    = feature_name,
+      n_A        = length(x),
+      n_B        = length(y),
+      mean_A     = mean(x),
+      mean_B     = mean(y),
+      diff_mean  = mean(x) - mean(y),
+      t_stat     = NA_real_,
+      df         = NA_real_,
+      p_val      = NA_real_
+    )
+  } else {
+    tibble(
+      feature    = feature_name,
+      n_A        = length(x),
+      n_B        = length(y),
+      mean_A     = mean(x),
+      mean_B     = mean(y),
+      diff_mean  = mean(x) - mean(y),
+      t_stat     = unname(tt$statistic),
+      df         = unname(tt$parameter),
+      p_val      = unname(tt$p.value)
+    )
+  }
+}
+
+# Statistical testing step.
+run_all_ttests <- function(pairing_info, A_df, B_df, fdr_method = "BH",
+                           label_A = "group_A", label_B = "group_B") {
+
+  feats <- pairing_info$feature_cols_common
+
+  rows <- lapply(feats, function(fnm) {
+    ttest_one_feature(
+      feature_name  = fnm,
+      pairing_info  = pairing_info,
+      A_df          = A_df,
+      B_df          = B_df
+    )
+  })
+
+  out_tbl <- bind_rows(rows) %>%
+    mutate(
+      p_adj_BH = p.adjust(p_val, method = fdr_method),
+      sig_FDR_0_05 = p_adj_BH < 0.05,
+      group_A = label_A,
+      group_B = label_B
+    ) %>%
+    select(feature,
+           group_A, group_B,
+           n_A, n_B,
+           mean_A, mean_B, diff_mean,
+           t_stat, df, p_val,
+           p_adj_BH, sig_FDR_0_05)
+
+  out_tbl
+}
+
+###########################
+# Processing step.
+###########################
+
+# Candidate-set preparation.
+assign_list <- read_assignments(ASSIGN_XLSX)
+poly_assign_tbl <- assign_list$poly  # columns: query, assigned_candidate, status, ...
+mono_assign_tbl <- assign_list$mono  # columns: query, assigned_candidate, status, ...
+
+# Processing step.
+hom_raw_info  <- read_raw_dedup(RAW_HOM,  head_col = COL_HEADWORD, h_col_index = H_COL_INDEX)
+poly_raw_info <- read_raw_dedup(RAW_POLY, head_col = COL_HEADWORD, h_col_index = H_COL_INDEX)
+mono_raw_info <- read_raw_dedup(RAW_MONO, head_col = COL_HEADWORD, h_col_index = H_COL_INDEX)
+
+hom_df_dedup  <- hom_raw_info$df
+poly_df_dedup <- poly_raw_info$df
+mono_df_dedup <- mono_raw_info$df
+
+hom_feats  <- hom_raw_info$feature_cols
+poly_feats <- poly_raw_info$feature_cols
+mono_feats <- mono_raw_info$feature_cols
+
+# 3. homonym vs polyseme
+pair_hom_poly <- prepare_pairing_data(
+  A_df = hom_df_dedup,
+  B_df = poly_df_dedup,
+  assignment_tbl = poly_assign_tbl,
+  feature_cols_A = hom_feats,
+  feature_cols_B = poly_feats
+)
+ttest_hom_vs_poly <- run_all_ttests(
+  pairing_info = pair_hom_poly,
+  A_df = hom_df_dedup,
+  B_df = poly_df_dedup,
+  fdr_method = FDR_METHOD,
+  label_A = "homonym",
+  label_B = "polyseme"
+)
+
+# 4. homonym vs monoseme
+pair_hom_mono <- prepare_pairing_data(
+  A_df = hom_df_dedup,
+  B_df = mono_df_dedup,
+  assignment_tbl = mono_assign_tbl,
+  feature_cols_A = hom_feats,
+  feature_cols_B = mono_feats
+)
+ttest_hom_vs_mono <- run_all_ttests(
+  pairing_info = pair_hom_mono,
+  A_df = hom_df_dedup,
+  B_df = mono_df_dedup,
+  fdr_method = FDR_METHOD,
+  label_A = "homonym",
+  label_B = "monoseme"
+)
+
+# Candidate-set preparation.
+# Candidate-set preparation.
+# Candidate-set preparation.
+# Candidate-set preparation.
+# Candidate-set preparation.
+#
+# Processing step.
+# Candidate-set preparation.
+# Candidate-set preparation.
+#
+poly_mono_assign_tbl <- poly_assign_tbl %>%
+  filter(!is.na(assigned_candidate),
+         status != "special/no") %>%
+  select(query, poly_candidate = assigned_candidate)
+
+mono_mono_assign_tbl <- mono_assign_tbl %>%
+  filter(!is.na(assigned_candidate),
+         status != "special/no") %>%
+  select(query, mono_candidate = assigned_candidate)
+
+# Candidate-set preparation.
+poly_vs_mono_pairs <- poly_mono_assign_tbl %>%
+  inner_join(mono_mono_assign_tbl, by = "query") %>%
+  distinct(query, poly_candidate, mono_candidate)
+
+# Processing step.
+# query -> assigned_candidate
+poly_vs_mono_assignment_like <- poly_vs_mono_pairs %>%
+  transmute(query = poly_candidate,
+            assigned_candidate = mono_candidate,
+            status = "OK")  # dummy status so it passes filter
+
+pair_poly_mono <- prepare_pairing_data(
+  A_df = poly_df_dedup,
+  B_df = mono_df_dedup,
+  assignment_tbl = poly_vs_mono_assignment_like,
+  feature_cols_A = poly_feats,
+  feature_cols_B = mono_feats
+)
+
+ttest_poly_vs_mono <- run_all_ttests(
+  pairing_info = pair_poly_mono,
+  A_df = poly_df_dedup,
+  B_df = mono_df_dedup,
+  fdr_method = FDR_METHOD,
+  label_A = "polyseme",
+  label_B = "monoseme"
+)
+
+ttest_hom_vs_poly <- ttest_hom_vs_poly %>% mutate(across(where(is.numeric), ~ round(.x, 5)))
+ttest_hom_vs_mono <- ttest_hom_vs_mono %>% mutate(across(where(is.numeric), ~ round(.x, 5)))
+ttest_poly_vs_mono <- ttest_poly_vs_mono %>% mutate(across(where(is.numeric), ~ round(.x, 5)))
+
+
+###########################
+# Processing step.
+###########################
+
+wb <- createWorkbook()
+addWorksheet(wb, "settings")
+addWorksheet(wb, "ttest_hom_vs_poly")
+addWorksheet(wb, "ttest_hom_vs_mono")
+addWorksheet(wb, "ttest_poly_vs_mono")
+addWorksheet(wb, "pair_used_hom_poly")
+addWorksheet(wb, "pair_used_hom_mono")
+addWorksheet(wb, "pair_used_poly_mono")
+
+
+writeData(
+  wb, "settings",
+  tibble(
+    note = "Welch t-tests per feature comparing homonym vs polyseme, homonym vs monoseme, and polyseme vs monoseme. Data = RAW (features_saved_filtered). Pairs defined by unique cosine assignment; FDR = BH.",
+    H_COL_INDEX = H_COL_INDEX,
+    n_pair_hom_poly  = nrow(pair_hom_poly$pair_table),
+    n_pair_hom_mono  = nrow(pair_hom_mono$pair_table),
+    n_pair_poly_mono = nrow(pair_poly_mono$pair_table),
+    n_feat_hom_poly  = length(pair_hom_poly$feature_cols_common),
+    n_feat_hom_mono  = length(pair_hom_mono$feature_cols_common),
+    n_feat_poly_mono = length(pair_poly_mono$feature_cols_common)
+  )
+)
+
+
+
+writeData(wb, "ttest_hom_vs_poly", ttest_hom_vs_poly)
+writeData(wb, "ttest_hom_vs_mono", ttest_hom_vs_mono)
+writeData(wb, "ttest_poly_vs_mono", ttest_poly_vs_mono)
+
+
+writeData(wb, "pair_used_hom_poly",  pair_hom_poly$pair_table)
+writeData(wb, "pair_used_hom_mono",  pair_hom_mono$pair_table)
+writeData(wb, "pair_used_poly_mono", pair_poly_mono$pair_table)
+
+saveWorkbook(wb, OUT_XLSX, overwrite = TRUE)
+message("Output written: ", OUT_XLSX)
+
+```
+
+Expected output:
+- `CHANGE_THIS_TO_YOUR_PATH/05_raw_ttest/feature_level_ttests_hom_vs_poly_mono.xlsx`
+
+## Step 06: Build Sense-Count Summary with Polyseme and Monoseme Backups
+
+First compute baseline sense counts for cosine assignments, then refine the candidate set by adding unique 3-sense polyseme replacements and monoseme backup candidates.
+
+```{r step_06}
+ASSIGN_XLSX <- "CHANGE_THIS_TO_YOUR_PATH/04_cosine_similarity/similarity_topk_cosine_unique_assign_latestNorm.xlsx"
+
+FILE_HOM_SENSE  <- "CHANGE_THIS_TO_YOUR_PATH/01_organization/homonym_pos_sense_example_cleaned.xlsx"
+FILE_POLY_SENSE <- "CHANGE_THIS_TO_YOUR_PATH/01_organization/polyseme_pos_sense_example_cleaned.xlsx"
+FILE_MONO_SENSE <- "CHANGE_THIS_TO_YOUR_PATH/01_organization/monoseme_pos_sense_example_cleaned.xlsx"
+
+OUT_DIR  <- "CHANGE_THIS_TO_YOUR_PATH/06_sense_counts"
+OUT_XLSX <- file.path(OUT_DIR, "sense_counts_summary.xlsx")
+
+dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+
+# Processing step.
+# install.packages(c("readxl","openxlsx","dplyr","tibble"))
+library(readxl)
+library(openxlsx)
+library(dplyr)
+library(tibble)
+
+# Sense-count matching and candidate refinement.
+get_colname_loose <- function(df, target_name){
+    nm  <- names(df)
+    m   <- trimws(tolower(nm))
+    hit <- nm[m == tolower(target_name)]
+    if (length(hit) == 0) {
+        stop(
+            "Could not find required column: ", target_name,
+            " current columns: ", paste(names(df), collapse=", ")
+        )
+    }
+    hit[1]
+}
+
+# Sense-count matching and candidate refinement.
+sense_count_per_word <- function(path_excel){
+    df <- read_xlsx(path_excel)
+
+    # Sense-count matching and candidate refinement.
+    col_hw    <- get_colname_loose(df, "headword")
+    col_sense <- get_colname_loose(df, "sense1")
+
+    # Processing step.
+    tmp <- df %>%
+        mutate(
+            .hw    = .data[[col_hw]],
+            .sense = .data[[col_sense]]
+        ) %>%
+        # Sense-count matching and candidate refinement.
+        filter(
+            !is.na(.hw),
+            !is.na(.sense),
+            trimws(.sense) != ""
+        ) %>%
+        distinct(.hw, .sense)
+
+    # Processing step.
+    out <- tmp %>%
+        group_by(.hw) %>%
+        summarise(sense_count = n(), .groups = "drop") %>%
+        rename(headword = .hw)
+
+    out
+}
+
+# Processing step.
+assign_poly <- read_xlsx(ASSIGN_XLSX, sheet = "poly_assignment_unique")
+assign_mono <- read_xlsx(ASSIGN_XLSX, sheet = "mono_assignment_unique")
+
+assign_poly_clean <- assign_poly %>%
+    select(query,
+           assigned_candidate,
+           assigned_similarity,
+           assigned_rank,
+           status)
+
+assign_mono_clean <- assign_mono %>%
+    select(query,
+           assigned_candidate,
+           assigned_similarity,
+           assigned_rank,
+           status)
+
+# Sense-count matching and candidate refinement.
+hom_sense_tbl  <- sense_count_per_word(FILE_HOM_SENSE)  # Candidate-set preparation.
+poly_sense_tbl <- sense_count_per_word(FILE_POLY_SENSE)  # Candidate-set preparation.
+mono_sense_tbl <- sense_count_per_word(FILE_MONO_SENSE)  # Candidate-set preparation.
+
+# Sense-count matching and candidate refinement.
+
+## 3A. homonym vs polyseme
+poly_pairs_with_sense <- assign_poly_clean %>%
+    # Candidate-set preparation.
+    left_join(
+        hom_sense_tbl %>%
+            rename(homonym = headword,
+                   homonym_sense_number = sense_count),
+        by = c("query" = "homonym")
+    ) %>%
+    # Candidate-set preparation.
+    left_join(
+        poly_sense_tbl %>%
+            rename(polyseme_candidate = headword,
+                   polyseme_candidate_sense_number = sense_count),
+        by = c("assigned_candidate" = "polyseme_candidate")
+    ) %>%
+    transmute(
+        homonym = query,
+        homonym_sense_number,
+        polyseme_candidate = assigned_candidate,
+        polyseme_candidate_sense_number,
+        assigned_similarity,
+        assigned_rank,
+        status
+    )
+
+## 3B. homonym vs monoseme
+mono_pairs_with_sense <- assign_mono_clean %>%
+    # Sense-count matching and candidate refinement.
+    left_join(
+        hom_sense_tbl %>%
+            rename(homonym = headword,
+                   homonym_sense_number = sense_count),
+        by = c("query" = "homonym")
+    ) %>%
+    # Sense-count matching and candidate refinement.
+    left_join(
+        mono_sense_tbl %>%
+            rename(monoseme_candidate = headword,
+                   monoseme_candidate_sense_number = sense_count),
+        by = c("assigned_candidate" = "monoseme_candidate")
+    ) %>%
+    transmute(
+        homonym = query,
+        homonym_sense_number,
+        monoseme_candidate = assigned_candidate,
+        monoseme_candidate_sense_number,
+        assigned_similarity,
+        assigned_rank,
+        status
+    )
+
+# Processing step.
+poly_pairs_with_sense <- poly_pairs_with_sense %>%
+    mutate(across(where(is.numeric), ~ round(.x, 5)))
+mono_pairs_with_sense <- mono_pairs_with_sense %>%
+    mutate(across(where(is.numeric), ~ round(.x, 5)))
+
+# Processing step.
+wb <- createWorkbook()
+addWorksheet(wb, "settings")
+addWorksheet(wb, "homonym_vs_polyseme")
+addWorksheet(wb, "homonym_vs_monoseme")
+
+writeData(
+    wb, "settings",
+    tibble(
+        note = "For each homonym and its assigned polyseme/monoseme (from cosine gap-based assignment), we count unique sense1 per word from *_pos_sense_example_cleaned.xlsx.",
+        n_pairs_poly = nrow(poly_pairs_with_sense),
+        n_pairs_mono = nrow(mono_pairs_with_sense)
+    )
+)
+
+writeData(wb, "homonym_vs_polyseme", poly_pairs_with_sense)
+writeData(wb, "homonym_vs_monoseme", mono_pairs_with_sense)
+
+dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+saveWorkbook(wb, OUT_XLSX, overwrite = TRUE)
+message("Output written: ", OUT_XLSX)
+
+
+# ---- Final sense-balanced candidate refinement ----
+ASSIGN_XLSX <- "CHANGE_THIS_TO_YOUR_PATH/04_cosine_similarity/similarity_topk_cosine_unique_assign_latestNorm.xlsx"
+SENSE_XLSX  <- "CHANGE_THIS_TO_YOUR_PATH/06_sense_counts/sense_counts_summary.xlsx"
+
+# Cosine similarity and candidate ranking.
+NORM_HOM  <- "CHANGE_THIS_TO_YOUR_PATH/03_normaliation_91/homonym_pos_sense_features_91saved_filtered_normalized_z.xlsx"
+NORM_POLY <- "CHANGE_THIS_TO_YOUR_PATH/03_normaliation_91/polyseme_pos_sense_features_91saved_filtered_normalized_z.xlsx"
+
+# Sense-count matching and candidate refinement.
+POLY_PREPROC <- "CHANGE_THIS_TO_YOUR_PATH/01_organization/polyseme_data_preprocess.xlsx"  # sheet: sense_example_grid
+
+OUT_DIR  <- "CHANGE_THIS_TO_YOUR_PATH/06_sense_counts"
+OUT_XLSX <- file.path(OUT_DIR, "sense_counts_summary_WITH_poly3_mono_backups.xlsx")
+
+# Processing step.
+COL_HEADWORD <- "headword"
+H_COL_INDEX  <- 8
+digits_keep  <- 5
+
+dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+
+# Processing step.
+# install.packages(c("readxl","openxlsx","dplyr","tibble","stringr","purrr"))
+library(readxl); library(openxlsx); library(dplyr); library(tibble); library(stringr); library(purrr)
+
+# Processing step.
+round5 <- function(x) round(x, digits_keep)
+
+read_norm_sheet <- function(path, sheet = "normalized_z_restored_shape") {
+  read_xlsx(path, sheet = sheet)
+}
+
+# Processing step.
+extract_feature_matrix <- function(df, headword_col = COL_HEADWORD, h_col_index = H_COL_INDEX){
+  if (!(headword_col %in% names(df))) {
+    nm <- names(df)
+    hit <- nm[ trimws(tolower(nm)) == "headword" ]
+    if (length(hit) == 0) stop("Could not find the headword column.")
+    headword_col <- hit[1]
+  }
+  if (h_col_index > ncol(df)) stop("H_COL_INDEX exceeds the number of columns.")
+
+  feature_cols <- names(df)[h_col_index:ncol(df)]
+  df_hf <- df[, c(headword_col, feature_cols), drop = FALSE] %>%
+    distinct(.data[[headword_col]], .keep_all = TRUE)
+  names(df_hf)[1] <- "headword"
+  for (j in 2:ncol(df_hf)) {
+    if (!is.numeric(df_hf[[j]])) suppressWarnings(df_hf[[j]] <- as.numeric(df_hf[[j]]))
+  }
+  # Processing step.
+  for (j in 2:ncol(df_hf)) {
+    x <- df_hf[[j]]
+    if (anyNA(x)) {
+      med <- suppressWarnings(stats::median(x, na.rm = TRUE))
+      if (is.na(med) || is.infinite(med)) med <- 0
+      x[is.na(x)] <- med
+      df_hf[[j]] <- x
+    }
+  }
+  list(
+    ids = df_hf$headword,
+    mat = as.matrix(df_hf[, -1, drop = FALSE]),
+    feat_names = colnames(df_hf)[-1]
+  )
+}
+
+cosine_sim <- function(A, B){
+  A <- as.matrix(A); B <- as.matrix(B)
+  An <- sqrt(rowSums(A*A)); Bn <- sqrt(rowSums(B*B))
+  An[An==0] <- 1e-12; Bn[Bn==0] <- 1e-12
+  (A %*% t(B)) / (An %o% Bn)
+}
+
+# Candidate-set preparation.
+read_cos_topk_mono <- function(assign_xlsx){
+  read_xlsx(assign_xlsx, sheet = "cos_topk_mono") %>%
+    select(query, rank, candidate, similarity)
+}
+
+# Sense-count matching and candidate refinement.
+poly3_from_preproc <- function(path_preproc){
+  df <- read_xlsx(path_preproc, sheet = "sense_example_grid")
+  if (!all(c("sense_category_number","all_words") %in% names(df))) {
+    stop("polyseme_data_preprocess.xlsx is missing required columns: sense_category_number or all_words")
+  }
+  w <- df %>% filter(as.integer(sense_category_number) == 3) %>%
+    pull(all_words) %>% as.character()
+  if (length(w) == 0) return(character(0))
+  words <- unlist(str_split(paste(w, collapse = " "), pattern = "[,ï¼Œã€\\s]+"))
+  words <- unique(words[nzchar(words)])
+  words
+}
+
+# Candidate-set preparation.
+reorder_by_vector <- function(tbl, col_name, order_vec){
+  tbl %>%
+    mutate(.ord_factor = factor(.data[[col_name]], levels = order_vec)) %>%
+    arrange(.ord_factor) %>%
+    select(-.ord_factor)
+}
+
+# Gap-based conflict resolution and uniqueness handling.
+rank_3sense_for_one <- function(h_vec, P3mat, poly3_words){
+  hn <- sqrt(sum(h_vec*h_vec)); if (hn == 0) hn <- 1e-12
+  pn <- sqrt(rowSums(P3mat*P3mat)); pn[pn==0] <- 1e-12
+  simv <- as.vector(h_vec %*% t(P3mat)) / (hn * pn)
+  ord  <- order(simv, decreasing = TRUE)
+  tibble(
+    candidate = poly3_words[ord],
+    sim       = simv[ord],
+    rank      = seq_along(ord)
+  )
+}
+
+# Gap-based conflict resolution and uniqueness handling.
+assign_unique_poly3 <- function(target_rows, Hmat, Hids, P3mat, poly3_words, banned_words){
+  if (nrow(target_rows) == 0) {
+    return(tibble(
+      homonym = character(0),
+      polyseme_3sense_top1 = character(0),
+      polyseme_3sense_top1_similarity = numeric(0),
+      polyseme_3sense_top1_sense_number = integer(0)
+    ))
+  }
+  homs <- target_rows$homonym
+
+  ranked_list <- list()
+  ptr_idx     <- integer(length(homs))
+  names(ptr_idx) <- homs
+
+  for (k in seq_along(homs)) {
+    hh <- homs[k]
+    i  <- match(hh, Hids)
+    if (is.na(i)) {
+      ranked_list[[hh]] <- tibble(candidate = character(0), sim = numeric(0), rank = integer(0))
+      ptr_idx[hh] <- NA_integer_
+      next
+    }
+    hrow <- matrix(Hmat[i, , drop = TRUE], nrow = 1)
+    rl0 <- {
+      hn <- sqrt(sum(hrow*hrow)); if (hn == 0) hn <- 1e-12
+      pn <- sqrt(rowSums(P3mat*P3mat)); pn[pn==0] <- 1e-12
+      simv <- as.vector(hrow %*% t(P3mat)) / (hn * pn)
+      ord  <- order(simv, decreasing = TRUE)
+      tibble(candidate = poly3_words[ord], sim = simv[ord], rank = seq_along(ord))
+    }
+    if (length(banned_words) > 0) {
+      rl0 <- rl0 %>% dplyr::filter(!(candidate %in% banned_words))
+    }
+    ranked_list[[hh]] <- rl0
+    ptr_idx[hh] <- if (nrow(rl0) >= 1) 1L else NA_integer_
+  }
+
+  current_choice <- function(hh){
+    idx <- ptr_idx[hh]
+    rl  <- ranked_list[[hh]]
+    if (is.na(idx) || idx < 1 || idx > nrow(rl)) {
+      return(list(cand = NA_character_, sim = NA_real_, gap = NA_real_))
+    }
+    sim1 <- rl$sim[idx]
+    sim2 <- if (idx + 1 <= nrow(rl)) rl$sim[idx + 1] else -Inf
+    gap  <- sim1 - sim2
+    list(cand = rl$candidate[idx], sim = sim1, gap = gap)
+  }
+
+  repeat {
+    assign_tbl <- lapply(homs, function(hh){
+      ch <- current_choice(hh)
+      tibble(homonym = hh, cand = ch$cand, sim = ch$sim, gap = ch$gap)
+    }) %>% dplyr::bind_rows()
+
+    if (is.list(assign_tbl$cand)) {
+      assign_tbl <- assign_tbl %>%
+        mutate(cand = vapply(cand,
+                             function(z) if (length(z)) as.character(z[[1]]) else NA_character_,
+                             FUN.VALUE = character(1)))
+    } else {
+      assign_tbl <- assign_tbl %>% mutate(cand = as.character(cand))
+    }
+
+    if (all(is.na(assign_tbl$cand))) break
+
+    conflict_keys <- assign_tbl %>%
+      dplyr::filter(!is.na(cand)) %>%
+      dplyr::count(cand, name = "n") %>%
+      dplyr::filter(n > 1) %>%
+      dplyr::pull(cand)
+
+    if (length(conflict_keys) == 0) break
+
+    for (ck in conflict_keys) {
+      comp <- assign_tbl %>% dplyr::filter(cand == ck)
+      win_row <- comp %>%
+        dplyr::arrange(dplyr::desc(gap), dplyr::desc(sim), match(homonym, homs)) %>%
+        dplyr::slice(1)
+      keep_h <- win_row$homonym[1]
+
+      losers <- setdiff(comp$homonym, keep_h)
+      for (hh in losers) {
+        idx <- ptr_idx[hh]
+        if (!is.na(idx)) {
+          ptr_idx[hh] <- idx + 1L
+          rl <- ranked_list[[hh]]
+          if (is.na(ptr_idx[hh]) || ptr_idx[hh] > nrow(rl)) ptr_idx[hh] <- NA_integer_
+        }
+      }
+    }
+  }
+
+  out <- lapply(homs, function(hh){
+    ch <- current_choice(hh)
+    tibble(
+      homonym = hh,
+      polyseme_3sense_top1 = ch$cand,
+      polyseme_3sense_top1_similarity = ch$sim,
+      polyseme_3sense_top1_sense_number = ifelse(is.na(ch$cand), NA_integer_, 3L)
+    )
+  }) %>% dplyr::bind_rows() %>%
+    dplyr::mutate(dplyr::across(where(is.numeric), round5))
+
+  out
+}
+
+# Processing step.
+poly_sheet <- read_xlsx(SENSE_XLSX, sheet = "homonym_vs_polyseme")
+mono_sheet <- read_xlsx(SENSE_XLSX, sheet = "homonym_vs_monoseme")
+
+poly_orig_cols <- names(poly_sheet)
+mono_orig_cols <- names(mono_sheet)
+
+hom_order_poly <- poly_sheet$homonym
+hom_order_mono <- mono_sheet$homonym
+
+# Gap-based conflict resolution and uniqueness handling.
+message("A) Polyseme step: select 3-sense polyseme candidates for rows with two senses and compute similarity_gap ...")
+
+hom_df_norm  <- read_norm_sheet(NORM_HOM,  "normalized_z_restored_shape")
+poly_df_norm <- read_norm_sheet(NORM_POLY, "normalized_z_restored_shape")
+hom_info  <- extract_feature_matrix(hom_df_norm,  COL_HEADWORD, H_COL_INDEX)
+poly_info <- extract_feature_matrix(poly_df_norm, COL_HEADWORD, H_COL_INDEX)
+
+common_feats <- intersect(colnames(hom_info$mat), colnames(poly_info$mat))
+if (length(common_feats) == 0) stop("The normalized homonym and polyseme tables have no shared feature columns.")
+Hmat <- hom_info$mat[,  common_feats, drop = FALSE]
+Pmat <- poly_info$mat[, common_feats, drop = FALSE]
+Hids <- hom_info$ids
+Pids <- poly_info$ids
+
+poly3_words <- poly3_from_preproc(POLY_PREPROC)
+poly3_words <- intersect(poly3_words, Pids)
+if (length(poly3_words) == 0) {
+  warning("No 3-sense polyseme was found in the normalized polyseme table; skipping appended poly3 columns.")
+}
+
+banned_words <- unique(na.omit(as.character(poly_sheet$polyseme_candidate)))
+
+if (length(poly3_words) > 0) {
+  target_rows <- poly_sheet %>%
+    transmute(homonym, polyseme_candidate_sense_number) %>%
+    filter(!is.na(polyseme_candidate_sense_number),
+           as.integer(polyseme_candidate_sense_number) == 2L)
+
+  idx_poly3 <- match(poly3_words, Pids)
+  P3mat <- Pmat[idx_poly3, , drop = FALSE]
+
+  chosen_df <- assign_unique_poly3(target_rows, Hmat, Hids, P3mat, poly3_words, banned_words)
+
+  poly_sheet <- poly_sheet %>%
+    left_join(chosen_df, by = "homonym")
+  new_cols <- setdiff(names(poly_sheet), poly_orig_cols)
+  poly_sheet <- poly_sheet[, c(poly_orig_cols, new_cols), drop = FALSE]
+}
+
+poly_sheet <- reorder_by_vector(poly_sheet, "homonym", hom_order_poly)
+
+# Gap-based conflict resolution and uniqueness handling.
+if ("assigned_similarity" %in% names(poly_sheet)) {
+  poly_sheet$assigned_similarity <- as.numeric(poly_sheet$assigned_similarity)
+} else {
+  stop("poly_sheet does not contain assigned_similarity.")
+}
+
+if ("polyseme_3sense_top1_similarity" %in% names(poly_sheet)) {
+  poly_sheet$polyseme_3sense_top1_similarity <- as.numeric(poly_sheet$polyseme_3sense_top1_similarity)
+} else {
+  stop("poly_sheet does not contain polyseme_3sense_top1_similarity.")
+}
+
+poly_sheet <- poly_sheet %>%
+  mutate(
+    polyseme_candidate_sense_number = as.integer(polyseme_candidate_sense_number),
+    polyseme_3sense_top1_sense_number = as.integer(polyseme_3sense_top1_sense_number),
+    similarity_gap = if_else(
+      !is.na(polyseme_candidate_sense_number) &
+        !is.na(polyseme_3sense_top1_sense_number) &
+        polyseme_candidate_sense_number == 2L &
+        polyseme_3sense_top1_sense_number == 3L &
+        !is.na(assigned_similarity) &
+        !is.na(polyseme_3sense_top1_similarity),
+      round5(assigned_similarity - polyseme_3sense_top1_similarity),
+      as.numeric(NA)
+    )
+  )
+
+poly_with_idx <- poly_sheet %>%
+  mutate(.row_id = dplyr::row_number())
+
+gap_candidates_poly <- poly_with_idx %>%
+  filter(!is.na(similarity_gap)) %>%
+  arrange(similarity_gap)
+
+n_pick_poly <- min(58L, nrow(gap_candidates_poly))
+
+poly_sheet <- poly_sheet %>%
+  mutate(
+    polyseme_candidate_instead = NA_character_,
+    sequence_number = NA_integer_,
+    polyseme_candidate_instead_whole = NA_character_
+  )
+
+if (n_pick_poly == 0L) {
+  warning("No similarity_gap is available for the polyseme step; skipping marking.")
+} else {
+  pick_rows_poly <- gap_candidates_poly$.row_id[seq_len(n_pick_poly)]
+  message("poly: marking ", n_pick_poly, " rows with replacement candidates and sequence numbers.")
+
+  poly_sheet$polyseme_candidate_instead[pick_rows_poly] <- poly_sheet$polyseme_3sense_top1[pick_rows_poly]
+  poly_sheet$sequence_number[pick_rows_poly] <- seq_len(n_pick_poly)
+}
+
+poly_sheet$polyseme_candidate_instead_whole <- ifelse(
+  !is.na(poly_sheet$polyseme_candidate_instead),
+  poly_sheet$polyseme_candidate_instead,
+  poly_sheet$polyseme_candidate
+)
+
+# Candidate-set preparation.
+message("B) Monoseme step: add two backup candidates and select alt2_word_other using the smallest alt1-alt2 similarity gap ...")
+
+cos_topk_mono <- read_cos_topk_mono(ASSIGN_XLSX) %>%
+  mutate(similarity = round5(similarity))
+
+used_mono <- unique(mono_sheet$monoseme_candidate)
+hom_list <- mono_sheet$homonym
+
+pick_two_backups <- function(hh) {
+  tk <- cos_topk_mono %>%
+    filter(query == hh) %>%
+    arrange(rank)
+  ranks_pref <- c(2,3,4,5)
+  alt <- list()
+  for (r in ranks_pref) {
+    cand <- tk %>% filter(rank == r)
+    if (nrow(cand) == 0) next
+    cand_word <- cand$candidate[1]
+    if (!(cand_word %in% used_mono)) {
+      alt[[length(alt)+1]] <- tibble(
+        homonym = hh,
+        alt_word = cand_word,
+        alt_rank = cand$rank[1],
+        alt_similarity = cand$similarity[1]
+      )
+      used_mono <<- c(used_mono, cand_word)
+      if (length(alt) == 2) break
+    }
+  }
+  if (length(alt) == 0) {
+    tibble(homonym = hh,
+           alt1_word = NA_character_, alt1_rank = NA_integer_, alt1_similarity = NA_real_,
+           alt2_word = NA_character_, alt2_rank = NA_integer_, alt2_similarity = NA_real_)
+  } else if (length(alt) == 1) {
+    a1 <- alt[[1]]
+    tibble(homonym = hh,
+           alt1_word = a1$alt_word, alt1_rank = a1$alt_rank, alt1_similarity = a1$alt_similarity,
+           alt2_word = NA_character_, alt2_rank = NA_integer_, alt2_similarity = NA_real_)
+  } else {
+    a1 <- alt[[1]]; a2 <- alt[[2]]
+    tibble(homonym = hh,
+           alt1_word = a1$alt_word, alt1_rank = a1$alt_rank, alt1_similarity = a1$alt_similarity,
+           alt2_word = a2$alt_word, alt2_rank = a2$alt_rank, alt2_similarity = a2$alt_similarity)
+  }
+}
+
+mono_backups <- bind_rows(lapply(hom_list, pick_two_backups)) %>%
+  mutate(
+    alt1_similarity = round5(alt1_similarity),
+    alt2_similarity = round5(alt2_similarity),
+    alt1_low_sim_flag = ifelse(!is.na(alt1_similarity) & alt1_similarity < 0.5, TRUE, FALSE),
+    alt2_low_sim_flag = ifelse(!is.na(alt2_similarity) & alt2_similarity < 0.5, TRUE, FALSE)
+  )
+
+mono_sheet <- mono_sheet %>%
+  left_join(mono_backups, by = "homonym") %>%
+  reorder_by_vector("homonym", hom_order_mono)
+new_cols_mono <- setdiff(names(mono_sheet), mono_orig_cols)
+mono_sheet <- mono_sheet[, c(mono_orig_cols, new_cols_mono), drop = FALSE]
+
+mono_two_backups <- mono_backups %>% reorder_by_vector("homonym", hom_order_mono)
+
+# Processing step.
+mono_sheet <- mono_sheet %>%
+  mutate(` ` = NA_character_)
+
+# Processing step.
+mono_sheet <- mono_sheet %>%
+  mutate(
+    alt1_word_all = alt1_word,
+    alt2_word_other = NA_character_,
+    similarity_gap_mono = NA_real_,
+    alt2_sequence_number = NA_integer_
+  )
+
+# Processing step.
+mono_with_idx <- mono_sheet %>%
+  mutate(.row_id = dplyr::row_number())
+
+gap_candidates_mono <- mono_with_idx %>%
+  filter(!is.na(alt1_similarity),
+         !is.na(alt2_similarity),
+         !is.na(alt2_rank),
+         alt2_rank == 3L) %>%
+  mutate(
+    gap_val = alt1_similarity - alt2_similarity
+  ) %>%
+  arrange(gap_val)  # Processing step.
+
+n_pick_mono <- min(83L, nrow(gap_candidates_mono))
+
+if (n_pick_mono == 0L) {
+  warning("Monoseme step: no rows meet the alt2_rank == 3 and non-missing similarity criteria.")
+} else {
+  pick_rows_mono <- gap_candidates_mono$.row_id[seq_len(n_pick_mono)]
+  message("mono: marking ", n_pick_mono, " rows with alt2 backups, similarity gaps, and sequence numbers.")
+
+  # Processing step.
+  mono_sheet$alt2_word_other[pick_rows_mono] <- mono_sheet$alt2_word[pick_rows_mono]
+  # Gap-based conflict resolution and uniqueness handling.
+  mono_sheet$similarity_gap_mono[pick_rows_mono] <- round5(
+    mono_sheet$alt1_similarity[pick_rows_mono] - mono_sheet$alt2_similarity[pick_rows_mono]
+  )
+  # alt2_sequence_numberï¼š1..n_pick_mono
+  mono_sheet$alt2_sequence_number[pick_rows_mono] <- seq_len(n_pick_mono)
+}
+
+# Processing step.
+wb <- createWorkbook()
+addWorksheet(wb, "settings")
+addWorksheet(wb, "homonym_vs_polyseme")
+addWorksheet(wb, "homonym_vs_monoseme")
+addWorksheet(wb, "mono_two_backups")
+
+writeData(wb, "settings", tibble(
+  note = paste0(
+    "poly: assign unique 3-sense polyseme candidates to rows whose original polyseme candidate has two senses; ",
+    "compute similarity_gap = assigned_similarity - polyseme_3sense_top1_similarity; ",
+    "mark the smallest-gap rows with polyseme_candidate_instead, sequence_number, and polyseme_candidate_instead_whole. ",
+    "mono: add alt1/alt2 backup candidates, copy alt1_word into alt1_word_all, and mark selected alt2_word_other rows using the smallest alt1-alt2 similarity gaps."
+  ),
+  norm_hom = NORM_HOM,
+  norm_poly = NORM_POLY,
+  poly_preproc = POLY_PREPROC,
+  assign_xlsx = ASSIGN_XLSX,
+  source_sense_xlsx = SENSE_XLSX,
+  common_feature_count_used = length(common_feats),
+  n_gap_pick_poly = n_pick_poly,
+  n_gap_pick_mono = n_pick_mono
+))
+
+writeData(wb, "homonym_vs_polyseme", poly_sheet)
+writeData(wb, "homonym_vs_monoseme", mono_sheet)
+writeData(wb, "mono_two_backups", mono_two_backups)
+
+saveWorkbook(wb, OUT_XLSX, overwrite = TRUE)
+message("Output written: ", OUT_XLSX)
+
+```
+
+Expected output:
+- `CHANGE_THIS_TO_YOUR_PATH/06_sense_counts/sense_counts_summary.xlsx`
+- `CHANGE_THIS_TO_YOUR_PATH/06_sense_counts/sense_counts_summary_WITH_poly3_mono_backups.xlsx`
+
+## Step 07: Run Final Welch and Wilcoxon Tests on Selected Candidate Sets
+
+Use the final sense-balanced candidate summary and the raw 91-feature tables to run the final Welch and Wilcoxon comparison suite.
+
+```{r step_07}
+SUMMARY_XLSX <- "CHANGE_THIS_TO_YOUR_PATH/06_sense_counts/sense_counts_summary_WITH_poly3_mono_backups.xlsx"
+
+RAW_HOM  <- "CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/homonym_pos_sense_features_91saved_filtered.xlsx"
+RAW_POLY <- "CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/polyseme_pos_sense_features_91saved_filtered.xlsx"
+RAW_MONO <- "CHANGE_THIS_TO_YOUR_PATH/02_91_features_saved/monoseme_pos_sense_features_91saved_filtered.xlsx"
+
+OUT_DIR  <- "CHANGE_THIS_TO_YOUR_PATH/07_final_ttest"
+OUT_WELCH  <- file.path(OUT_DIR, "final_Welch_candidate_words_ttest.xlsx")
+OUT_WILCOX <- file.path(OUT_DIR, "final_Wilcoxon_candidate_words_ttest.xlsx")
+
+dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+
+#####################
+# Processing step.
+#####################
+
+COL_HEADWORD <- "headword"
+H_COL_INDEX  <- 8
+FDR_METHOD   <- "BH"
+
+round5 <- function(x) round(x, 5)
+
+#####################
+# Processing step.
+#####################
+
+# Processing step.
+read_raw_dedup <- function(path, head_col = COL_HEADWORD, h_col_index = H_COL_INDEX) {
+  df <- read_xlsx(path)
+
+  # Processing step.
+  if (!(head_col %in% names(df))) {
+    nm  <- names(df)
+    hit <- nm[ trimws(tolower(nm)) == "headword" ]
+    if (length(hit) == 0) stop("Could not find the headword column in ", path)
+    head_col <- hit[1]
+  }
+
+  if (h_col_index > ncol(df)) {
+    stop("The file has fewer columns than H_COL_INDEX; please check: ", path)
+  }
+
+  feature_cols <- names(df)[h_col_index:ncol(df)]
+
+  # Processing step.
+  df_dedup <- df %>%
+    distinct(.data[[head_col]], .keep_all = TRUE)
+
+  # Processing step.
+  names(df_dedup)[names(df_dedup) == head_col] <- "headword"
+
+  # Processing step.
+  for (fn in feature_cols) {
+    if (!is.numeric(df_dedup[[fn]])) {
+      suppressWarnings({
+        df_dedup[[fn]] <- as.numeric(df_dedup[[fn]])
+      })
+    }
+  }
+
+  list(
+    df = df_dedup,
+    feature_cols = feature_cols
+  )
+}
+
+# Processing step.
+get_common_features <- function(hom_feats, poly_feats, mono_feats) {
+  Reduce(intersect, list(hom_feats, poly_feats, mono_feats))
+}
+
+# Processing step.
+extract_group_matrix <- function(df_raw, feature_cols, words) {
+  idx <- match(words, df_raw$headword)
+  ok  <- !is.na(idx)
+  if (!all(ok)) {
+    missing <- unique(words[!ok])
+    if (length(missing) > 0) {
+      warning("The following words were not found in the feature table and will be ignored:\n",
+              paste(head(missing, 20), collapse = ", "),
+              if (length(missing) > 20) " ...")
+    }
+  }
+  idx_use <- idx[ok]
+  if (length(idx_use) == 0) {
+    return(list(words = character(0), mat = matrix(nrow = 0, ncol = length(feature_cols))))
+  }
+  sub <- df_raw[idx_use, feature_cols, drop = FALSE]
+  m   <- as.matrix(sub)
+  rownames(m) <- df_raw$headword[idx_use]
+  list(words = df_raw$headword[idx_use], mat = m)
+}
+
+#####################
+## Welch t-testï¼ˆindependentï¼‰
+#####################
+
+ttest_featurewise_welch <- function(mat_x, mat_y, feat_names,
+                                    label_x = "group_X", label_y = "group_Y") {
+  stopifnot(ncol(mat_x) == length(feat_names),
+            ncol(mat_y) == length(feat_names))
+
+  res_list <- lapply(seq_along(feat_names), function(j) {
+    feat <- feat_names[j]
+    x <- mat_x[, j]
+    y <- mat_y[, j]
+
+    # Processing step.
+    x2 <- x[is.finite(x)]
+    y2 <- y[is.finite(y)]
+    n_x <- length(x2)
+    n_y <- length(y2)
+
+    if (n_x < 2 || n_y < 2) {
+      return(tibble(
+        feature   = feat,
+        n_x       = n_x,
+        n_y       = n_y,
+        mean_x    = if (length(x2)) mean(x2) else NA_real_,
+        mean_y    = if (length(y2)) mean(y2) else NA_real_,
+        diff_mean = if (length(x2) && length(y2)) mean(x2) - mean(y2) else NA_real_,
+        t_stat    = NA_real_,
+        df        = NA_real_,
+        p_value   = NA_real_,
+        group_x   = label_x,
+        group_y   = label_y
+      ))
+    }
+
+    tt <- tryCatch(
+      t.test(x2, y2, var.equal = FALSE),  # Welch independent t-test
+      error = function(e) NULL
+    )
+
+    if (is.null(tt)) {
+      tibble(
+        feature   = feat,
+        n_x       = n_x,
+        n_y       = n_y,
+        mean_x    = mean(x2),
+        mean_y    = mean(y2),
+        diff_mean = mean(x2) - mean(y2),
+        t_stat    = NA_real_,
+        df        = NA_real_,
+        p_value   = NA_real_,
+        group_x   = label_x,
+        group_y   = label_y
+      )
+    } else {
+      tibble(
+        feature   = feat,
+        n_x       = n_x,
+        n_y       = n_y,
+        mean_x    = mean(x2),
+        mean_y    = mean(y2),
+        diff_mean = mean(x2) - mean(y2),
+        t_stat    = unname(tt$statistic),
+        df        = unname(tt$parameter),
+        p_value   = tt$p.value,
+        group_x   = label_x,
+        group_y   = label_y
+      )
+    }
+  })
+
+  bind_rows(res_list) %>%
+    mutate(
+      mean_x    = round5(mean_x),
+      mean_y    = round5(mean_y),
+      diff_mean = round5(diff_mean),
+      t_stat    = round5(t_stat),
+      df        = round5(df),
+      p_value   = round5(p_value)
+    )
+}
+
+add_fdr_welch <- function(res_tbl, fdr_method = "BH") {
+  if (all(is.na(res_tbl$p_value))) {
+    res_tbl$p_adj <- NA_real_
+  } else {
+    res_tbl$p_adj <- p.adjust(res_tbl$p_value, method = fdr_method)
+  }
+  res_tbl %>%
+    mutate(
+      p_adj        = round5(p_adj),
+      sig_FDR_0_05 = !is.na(p_adj) & p_adj < 0.05
+    ) %>%
+    select(feature, group_x, group_y,
+           n_x, n_y,
+           mean_x, mean_y, diff_mean,
+           t_stat, df, p_value, p_adj,
+           sig_FDR_0_05)
+}
+
+#####################
+## Wilcoxon rank-sumï¼ˆindependentï¼‰
+#####################
+
+wilcox_featurewise_indep <- function(mat_x, mat_y, feat_names,
+                                     label_x = "group_X", label_y = "group_Y") {
+  stopifnot(ncol(mat_x) == length(feat_names),
+            ncol(mat_y) == length(feat_names))
+
+  res_list <- lapply(seq_along(feat_names), function(j) {
+    feat <- feat_names[j]
+    x <- mat_x[, j]
+    y <- mat_y[, j]
+
+    # Processing step.
+    x2 <- x[is.finite(x)]
+    y2 <- y[is.finite(y)]
+    n_x <- length(x2)
+    n_y <- length(y2)
+
+    if (n_x < 1 || n_y < 1) {
+      return(tibble(
+        feature   = feat,
+        n_x       = n_x,
+        n_y       = n_y,
+        W         = NA_real_,
+        p_value   = NA_real_,
+        median_x  = if (length(x2)) median(x2) else NA_real_,
+        median_y  = if (length(y2)) median(y2) else NA_real_,
+        group_x   = label_x,
+        group_y   = label_y
+      ))
+    }
+
+    wt <- tryCatch(
+      wilcox.test(x2, y2, paired = FALSE, exact = FALSE),
+      error = function(e) NULL
+    )
+
+    if (is.null(wt)) {
+      tibble(
+        feature   = feat,
+        n_x       = n_x,
+        n_y       = n_y,
+        W         = NA_real_,
+        p_value   = NA_real_,
+        median_x  = median(x2),
+        median_y  = median(y2),
+        group_x   = label_x,
+        group_y   = label_y
+      )
+    } else {
+      tibble(
+        feature   = feat,
+        n_x       = n_x,
+        n_y       = n_y,
+        W         = unname(wt$statistic),
+        p_value   = wt$p.value,
+        median_x  = median(x2),
+        median_y  = median(y2),
+        group_x   = label_x,
+        group_y   = label_y
+      )
+    }
+  })
+
+  bind_rows(res_list) %>%
+    mutate(
+      median_x = round5(median_x),
+      median_y = round5(median_y),
+      W        = round5(W),
+      p_value  = round5(p_value)
+    )
+}
+
+add_fdr_wilcox <- function(res_tbl, fdr_method = "BH") {
+  if (all(is.na(res_tbl$p_value))) {
+    res_tbl$p_adj <- NA_real_
+  } else {
+    res_tbl$p_adj <- p.adjust(res_tbl$p_value, method = fdr_method)
+  }
+  res_tbl %>%
+    mutate(
+      p_adj       = round5(p_adj),
+      diff_median = round5(median_x - median_y),
+      sig_FDR_0_05 = !is.na(p_adj) & p_adj < 0.05
+    ) %>%
+    select(feature, group_x, group_y,
+           n_x, n_y,
+           W, p_value, p_adj,
+           median_x, median_y, diff_median,
+           sig_FDR_0_05)
+}
+
+#####################
+# Processing step.
+#####################
+
+message(">>> Reading summary file ...")
+poly_sheet <- read_xlsx(SUMMARY_XLSX, sheet = "homonym_vs_polyseme")
+mono_sheet <- read_xlsx(SUMMARY_XLSX, sheet = "homonym_vs_monoseme")
+
+message(">>> Reading raw feature files ...")
+hom_raw_info  <- read_raw_dedup(RAW_HOM,  head_col = COL_HEADWORD, h_col_index = H_COL_INDEX)
+poly_raw_info <- read_raw_dedup(RAW_POLY, head_col = COL_HEADWORD, h_col_index = H_COL_INDEX)
+mono_raw_info <- read_raw_dedup(RAW_MONO, head_col = COL_HEADWORD, h_col_index = H_COL_INDEX)
+
+hom_df  <- hom_raw_info$df
+poly_df <- poly_raw_info$df
+mono_df <- mono_raw_info$df
+
+hom_feats  <- hom_raw_info$feature_cols
+poly_feats <- poly_raw_info$feature_cols
+mono_feats <- mono_raw_info$feature_cols
+
+common_feats <- get_common_features(hom_feats, poly_feats, mono_feats)
+if (length(common_feats) == 0) {
+  stop("The three raw feature tables have no common feature columns; check H_COL_INDEX or column names.")
+} else {
+  message("Number of common features: ", length(common_feats))
+}
+
+## ---------- Step1: hom vs poly ----------
+message("Preparing Step1: homonym vs polyseme_candidate_instead_whole ...")
+
+if (!("polyseme_candidate_instead_whole" %in% names(poly_sheet))) {
+  stop("poly_sheet does not contain the polyseme_candidate_instead_whole column.")
+}
+
+pairs_poly <- poly_sheet %>%
+  select(homonym, polyseme_candidate_instead_whole) %>%
+  filter(!is.na(homonym),
+         !is.na(polyseme_candidate_instead_whole))
+
+hom_idx1  <- match(pairs_poly$homonym, hom_df$headword)
+poly_idx1 <- match(pairs_poly$polyseme_candidate_instead_whole, poly_df$headword)
+ok_pair1  <- !is.na(hom_idx1) & !is.na(poly_idx1)
+
+hom_mat_1  <- as.matrix(hom_df[hom_idx1[ok_pair1],  common_feats, drop = FALSE])
+poly_mat_1 <- as.matrix(poly_df[poly_idx1[ok_pair1], common_feats, drop = FALSE])
+
+n_hom_step1  <- nrow(hom_mat_1)
+n_poly_step1 <- nrow(poly_mat_1)
+
+## ---------- Step2: hom vs ALL monoseme ----------
+message("Preparing Step2: homonym vs all monoseme candidates ...")
+
+cols_needed_mono <- c("monoseme_candidate", "alt1_word_all", "alt2_word_other")
+missing_cols_mono <- setdiff(cols_needed_mono, names(mono_sheet))
+if (length(missing_cols_mono) > 0) {
+  stop("mono_sheet is missing columns: ", paste(missing_cols_mono, collapse = ", "))
+}
+
+hom_words_2 <- unique(na.omit(mono_sheet$homonym))  # Processing step.
+mono_words_all <- c(
+  mono_sheet$monoseme_candidate,
+  mono_sheet$alt1_word_all,
+  mono_sheet$alt2_word_other
+)
+mono_words_all <- unique(na.omit(mono_words_all))  # Processing step.
+
+hom_group2  <- extract_group_matrix(hom_df,  common_feats, hom_words_2)
+mono_group2 <- extract_group_matrix(mono_df, common_feats, mono_words_all)
+
+hom_mat_2  <- hom_group2$mat
+mono_mat_2 <- mono_group2$mat
+
+n_hom_step2  <- nrow(hom_mat_2)
+n_mono_step2 <- nrow(mono_mat_2)
+
+## ---------- Step3: ALL poly vs ALL monoseme ----------
+message("Preparing Step3: all polyseme candidates vs all monoseme candidates ...")
+
+poly_words_all <- unique(na.omit(poly_sheet$polyseme_candidate_instead_whole))
+poly_group3 <- extract_group_matrix(poly_df, common_feats, poly_words_all)
+mono_group3 <- extract_group_matrix(mono_df, common_feats, mono_words_all)
+
+poly_mat_3 <- poly_group3$mat
+mono_mat_3 <- mono_group3$mat
+
+n_poly_step3 <- nrow(poly_mat_3)
+n_mono_step3 <- nrow(mono_mat_3)
+
+## ---------- Step4: hom vs monoseme_candidate top1 ----------
+message("Preparing Step4: homonym vs monoseme_candidate (top1) ...")
+
+pairs_mono_top1 <- mono_sheet %>%
+  select(homonym, monoseme_candidate) %>%
+  filter(!is.na(homonym),
+         !is.na(monoseme_candidate))
+
+hom_idx4  <- match(pairs_mono_top1$homonym, hom_df$headword)
+mono_idx4 <- match(pairs_mono_top1$monoseme_candidate, mono_df$headword)
+ok_pair4  <- !is.na(hom_idx4) & !is.na(mono_idx4)
+
+hom_mat_4  <- as.matrix(hom_df[hom_idx4[ok_pair4],  common_feats, drop = FALSE])
+mono_mat_4 <- as.matrix(mono_df[mono_idx4[ok_pair4], common_feats, drop = FALSE])
+
+n_hom_step4  <- nrow(hom_mat_4)
+n_mono_step4 <- nrow(mono_mat_4)
+
+## ---------- Step5: polyseme_candidate_instead_whole vs monoseme_candidate top1 ----------
+message("Preparing Step5: polyseme_candidate_instead_whole vs monoseme_candidate (top1) ...")
+
+poly_top <- poly_sheet %>%
+  select(homonym, polyseme_candidate_instead_whole) %>%
+  filter(!is.na(homonym),
+         !is.na(polyseme_candidate_instead_whole))
+
+mono_top <- mono_sheet %>%
+  select(homonym, monoseme_candidate) %>%
+  filter(!is.na(homonym),
+         !is.na(monoseme_candidate))
+
+pairs_poly_mono_top1 <- poly_top %>%
+  inner_join(mono_top, by = "homonym") %>%
+  distinct(homonym, polyseme_candidate_instead_whole, monoseme_candidate)
+
+poly_idx5 <- match(pairs_poly_mono_top1$polyseme_candidate_instead_whole, poly_df$headword)
+mono_idx5 <- match(pairs_poly_mono_top1$monoseme_candidate, mono_df$headword)
+ok_pair5  <- !is.na(poly_idx5) & !is.na(mono_idx5)
+
+poly_mat_5 <- as.matrix(poly_df[poly_idx5[ok_pair5], common_feats, drop = FALSE])
+mono_mat_5 <- as.matrix(mono_df[mono_idx5[ok_pair5], common_feats, drop = FALSE])
+
+n_poly_step5 <- nrow(poly_mat_5)
+n_mono_step5 <- nrow(mono_mat_5)
+
+############################################################
+## Part 1: Welch's independent t-tests
+############################################################
+message(">>> Part 1: Welch independent t-tests ...")
+
+welch_step1_raw <- ttest_featurewise_welch(
+  mat_x = hom_mat_1,
+  mat_y = poly_mat_1,
+  feat_names = common_feats,
+  label_x = "homonym",
+  label_y = "polyseme_candidate_instead_whole"
+)
+welch_step1 <- add_fdr_welch(welch_step1_raw, fdr_method = FDR_METHOD)
+
+welch_step2_raw <- ttest_featurewise_welch(
+  mat_x = hom_mat_2,
+  mat_y = mono_mat_2,
+  feat_names = common_feats,
+  label_x = "homonym",
+  label_y = "all_monoseme_candidates"
+)
+welch_step2 <- add_fdr_welch(welch_step2_raw, fdr_method = FDR_METHOD)
+
+welch_step3_raw <- ttest_featurewise_welch(
+  mat_x = poly_mat_3,
+  mat_y = mono_mat_3,
+  feat_names = common_feats,
+  label_x = "all_polyseme_candidates",
+  label_y = "all_monoseme_candidates"
+)
+welch_step3 <- add_fdr_welch(welch_step3_raw, fdr_method = FDR_METHOD)
+
+welch_step4_raw <- ttest_featurewise_welch(
+  mat_x = hom_mat_4,
+  mat_y = mono_mat_4,
+  feat_names = common_feats,
+  label_x = "homonym",
+  label_y = "monoseme_candidate_top1"
+)
+welch_step4 <- add_fdr_welch(welch_step4_raw, fdr_method = FDR_METHOD)
+
+welch_step5_raw <- ttest_featurewise_welch(
+  mat_x = poly_mat_5,
+  mat_y = mono_mat_5,
+  feat_names = common_feats,
+  label_x = "polyseme_candidate_instead_whole",
+  label_y = "monoseme_candidate_top1"
+)
+welch_step5 <- add_fdr_welch(welch_step5_raw, fdr_method = FDR_METHOD)
+
+############################################################
+# Processing step.
+############################################################
+message(">>> Writing Welch t-test results ...")
+
+wb_welch <- createWorkbook()
+addWorksheet(wb_welch, "settings")
+addWorksheet(wb_welch, "step1_hom_vs_poly")
+addWorksheet(wb_welch, "step2_hom_vs_mono_all")
+addWorksheet(wb_welch, "step3_poly_vs_mono_all")
+addWorksheet(wb_welch, "step4_hom_vs_mono_top1")
+addWorksheet(wb_welch, "step5_poly_vs_mono_top1")
+
+writeData(
+  wb_welch, "settings",
+  tibble(
+    note = c(
+      "All tests are Welch's independent t-tests (two-sample).",
+      "Step1: homonym vs polyseme_candidate_instead_whole.",
+      "Step2: homonym vs ALL monoseme candidates (monoseme_candidate + alt1_word_all + alt2_word_other).",
+      "Step3: ALL polyseme candidates vs ALL monoseme candidates.",
+      "Step4: homonym vs monoseme_candidate (top1).",
+      "Step5: polyseme_candidate_instead_whole vs monoseme_candidate (top1)."
+    ),
+    summary_file = SUMMARY_XLSX,
+    raw_hom = RAW_HOM,
+    raw_poly = RAW_POLY,
+    raw_mono = RAW_MONO,
+    H_COL_INDEX = H_COL_INDEX,
+    common_feature_count = length(common_feats),
+    n_hom_step1  = n_hom_step1,
+    n_poly_step1 = n_poly_step1,
+    n_hom_step2  = n_hom_step2,
+    n_mono_step2 = n_mono_step2,
+    n_poly_step3 = n_poly_step3,
+    n_mono_step3 = n_mono_step3,
+    n_hom_step4  = n_hom_step4,
+    n_mono_step4 = n_mono_step4,
+    n_poly_step5 = n_poly_step5,
+    n_mono_step5 = n_mono_step5
+  )
+)
+
+writeData(wb_welch, "step1_hom_vs_poly",       welch_step1)
+writeData(wb_welch, "step2_hom_vs_mono_all",  welch_step2)
+writeData(wb_welch, "step3_poly_vs_mono_all", welch_step3)
+writeData(wb_welch, "step4_hom_vs_mono_top1", welch_step4)
+writeData(wb_welch, "step5_poly_vs_mono_top1", welch_step5)
+
+saveWorkbook(wb_welch, OUT_WELCH, overwrite = TRUE)
+message("Welch t-test output written: ", OUT_WELCH)
+
+############################################################
+## Part 2: Wilcoxon rank-sum tests (independent)
+############################################################
+message(">>> Part 2: Wilcoxon rank-sum tests (independent) ...")
+
+wilcox_step1_raw <- wilcox_featurewise_indep(
+  mat_x = hom_mat_1,
+  mat_y = poly_mat_1,
+  feat_names = common_feats,
+  label_x = "homonym",
+  label_y = "polyseme_candidate_instead_whole"
+)
+wilcox_step1 <- add_fdr_wilcox(wilcox_step1_raw, fdr_method = FDR_METHOD)
+
+wilcox_step2_raw <- wilcox_featurewise_indep(
+  mat_x = hom_mat_2,
+  mat_y = mono_mat_2,
+  feat_names = common_feats,
+  label_x = "homonym",
+  label_y = "all_monoseme_candidates"
+)
+wilcox_step2 <- add_fdr_wilcox(wilcox_step2_raw, fdr_method = FDR_METHOD)
+
+wilcox_step3_raw <- wilcox_featurewise_indep(
+  mat_x = poly_mat_3,
+  mat_y = mono_mat_3,
+  feat_names = common_feats,
+  label_x = "all_polyseme_candidates",
+  label_y = "all_monoseme_candidates"
+)
+wilcox_step3 <- add_fdr_wilcox(wilcox_step3_raw, fdr_method = FDR_METHOD)
+
+wilcox_step4_raw <- wilcox_featurewise_indep(
+  mat_x = hom_mat_4,
+  mat_y = mono_mat_4,
+  feat_names = common_feats,
+  label_x = "homonym",
+  label_y = "monoseme_candidate_top1"
+)
+wilcox_step4 <- add_fdr_wilcox(wilcox_step4_raw, fdr_method = FDR_METHOD)
+
+wilcox_step5_raw <- wilcox_featurewise_indep(
+  mat_x = poly_mat_5,
+  mat_y = mono_mat_5,
+  feat_names = common_feats,
+  label_x = "polyseme_candidate_instead_whole",
+  label_y = "monoseme_candidate_top1"
+)
+wilcox_step5 <- add_fdr_wilcox(wilcox_step5_raw, fdr_method = FDR_METHOD)
+
+############################################################
+# Statistical testing step.
+############################################################
+message(">>> Writing Wilcoxon rank-sum results ...")
+
+wb_wilcox <- createWorkbook()
+addWorksheet(wb_wilcox, "settings")
+addWorksheet(wb_wilcox, "step1_hom_vs_poly")
+addWorksheet(wb_wilcox, "step2_hom_vs_mono_all")
+addWorksheet(wb_wilcox, "step3_poly_vs_mono_all")
+addWorksheet(wb_wilcox, "step4_hom_vs_mono_top1")
+addWorksheet(wb_wilcox, "step5_poly_vs_mono_top1")
+
+writeData(
+  wb_wilcox, "settings",
+  tibble(
+    note = c(
+      "All tests are Wilcoxon rank-sum tests (independent, non-parametric).",
+      "Step1: homonym vs polyseme_candidate_instead_whole.",
+      "Step2: homonym vs ALL monoseme candidates (monoseme_candidate + alt1_word_all + alt2_word_other).",
+      "Step3: ALL polyseme candidates vs ALL monoseme candidates.",
+      "Step4: homonym vs monoseme_candidate (top1).",
+      "Step5: polyseme_candidate_instead_whole vs monoseme_candidate (top1)."
+    ),
+    summary_file = SUMMARY_XLSX,
+    raw_hom = RAW_HOM,
+    raw_poly = RAW_POLY,
+    raw_mono = RAW_MONO,
+    H_COL_INDEX = H_COL_INDEX,
+    common_feature_count = length(common_feats),
+    n_hom_step1  = n_hom_step1,
+    n_poly_step1 = n_poly_step1,
+    n_hom_step2  = n_hom_step2,
+    n_mono_step2 = n_mono_step2,
+    n_poly_step3 = n_poly_step3,
+    n_mono_step3 = n_mono_step3,
+    n_hom_step4  = n_hom_step4,
+    n_mono_step4 = n_mono_step4,
+    n_poly_step5 = n_poly_step5,
+    n_mono_step5 = n_mono_step5
+  )
+)
+
+writeData(wb_wilcox, "step1_hom_vs_poly",       wilcox_step1)
+writeData(wb_wilcox, "step2_hom_vs_mono_all",  wilcox_step2)
+writeData(wb_wilcox, "step3_poly_vs_mono_all", wilcox_step3)
+writeData(wb_wilcox, "step4_hom_vs_mono_top1", wilcox_step4)
+writeData(wb_wilcox, "step5_poly_vs_mono_top1", wilcox_step5)
+
+saveWorkbook(wb_wilcox, OUT_WILCOX, overwrite = TRUE)
+message("Wilcoxon rank-sum output written: ", OUT_WILCOX)
+```
+
+Expected output:
+- `CHANGE_THIS_TO_YOUR_PATH/07_final_ttest/final_Welch_candidate_words_ttest.xlsx`
+- `CHANGE_THIS_TO_YOUR_PATH/07_final_ttest/final_Wilcoxon_candidate_words_ttest.xlsx`
+
+## Step 08: Export Final Selected Word Tables
+
+Use the final sense-balanced summary to extract the selected homonym, polyseme, and monoseme rows from the cleaned lexical tables and write the final selected-word workbook.
+
+```{r step_08}
+# ====================== Configuration: change this to your path ======================
+SUMMARY_XLSX <- "CHANGE_THIS_TO_YOUR_PATH/06_sense_counts/sense_counts_summary_WITH_poly3_mono_backups.xlsx"
+
+HOM_EXAMPLE_FILE  <- "CHANGE_THIS_TO_YOUR_PATH/01_organization/homonym_pos_sense_example_cleaned.xlsx"
+POLY_EXAMPLE_FILE <- "CHANGE_THIS_TO_YOUR_PATH/01_organization/polyseme_pos_sense_example_cleaned.xlsx"
+MONO_EXAMPLE_FILE <- "CHANGE_THIS_TO_YOUR_PATH/01_organization/monoseme_pos_sense_example_cleaned.xlsx"
+
+OUT_DIR  <- "CHANGE_THIS_TO_YOUR_PATH/08_final_all_words_select"
+OUT_XLSX <- file.path(OUT_DIR, "final_all_words_selected.xlsx")
+
+dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+
+# ====================== Packages ======================
+library(readxl)
+library(openxlsx)
+library(dplyr)
+library(tibble)
+
+# ====================== Helper functions ======================
+read_first_sheet <- function(path) {
+  read_xlsx(path, sheet = 1)
+}
+
+get_col_loose <- function(df, target) {
+  nm <- names(df)
+  hit <- nm[trimws(tolower(nm)) == tolower(target)]
+  if (length(hit) == 0) stop("Could not find required column: ", target)
+  hit[1]
+}
+
+extract_rows_by_words <- function(example_file, words, keep_cols = NULL) {
+  df <- read_first_sheet(example_file)
+  head_col <- get_col_loose(df, "headword")
+  words <- unique(na.omit(as.character(words)))
+  out <- df %>% filter(.data[[head_col]] %in% words)
+
+  if (!is.null(keep_cols)) {
+    cols <- keep_cols[keep_cols %in% names(out)]
+    out <- out[, cols, drop = FALSE]
+  }
+  out
+}
+
+# ====================== Read final candidate summary ======================
+poly_sheet <- read_xlsx(SUMMARY_XLSX, sheet = "homonym_vs_polyseme")
+mono_sheet <- read_xlsx(SUMMARY_XLSX, sheet = "homonym_vs_monoseme")
+
+# Homonym words come from the final summary table.
+hom_words <- unique(na.omit(poly_sheet$homonym))
+
+# Final polyseme words use the sense-balanced replacement column.
+if (!("polyseme_candidate_instead_whole" %in% names(poly_sheet))) {
+  stop("poly_sheet does not contain polyseme_candidate_instead_whole.")
+}
+poly_words <- unique(na.omit(poly_sheet$polyseme_candidate_instead_whole))
+
+# Final monoseme words combine the original candidate, alt1, and selected alt2 backup words.
+mono_cols <- c("monoseme_candidate", "alt1_word_all", "alt2_word_other")
+missing_mono_cols <- setdiff(mono_cols, names(mono_sheet))
+if (length(missing_mono_cols) > 0) {
+  stop("mono_sheet is missing required final-selection columns: ", paste(missing_mono_cols, collapse = ", "))
+}
+mono_words <- unique(na.omit(unlist(mono_sheet[mono_cols], use.names = FALSE)))
+
+# ====================== Extract final rows from cleaned lexical tables ======================
+final_homo <- extract_rows_by_words(
+  HOM_EXAMPLE_FILE,
+  hom_words,
+  keep_cols = c("headword", "definition", "clean1", "pos", "sense1", "example1", "select", "homograph", "polyseme")
+)
+
+final_poly <- extract_rows_by_words(
+  POLY_EXAMPLE_FILE,
+  poly_words,
+  keep_cols = c("headword", "definition", "clean1", "pos", "sense1", "example1")
+)
+
+final_mono <- extract_rows_by_words(
+  MONO_EXAMPLE_FILE,
+  mono_words,
+  keep_cols = c("headword", "definition", "clean1", "pos", "sense1", "example1")
+)
+
+# ====================== Write final workbook ======================
+wb <- createWorkbook()
+addWorksheet(wb, "final_homo")
+addWorksheet(wb, "final_poly")
+addWorksheet(wb, "final_mono")
+addWorksheet(wb, "settings")
+
+writeData(wb, "final_homo", final_homo)
+writeData(wb, "final_poly", final_poly)
+writeData(wb, "final_mono", final_mono)
+
+writeData(wb, "settings", tibble(
+  note = c(
+    "final_homo: homonym rows with definition/clean1/pos/sense1/example1 from the cleaned homonym table.",
+    "final_poly: polyseme rows selected by polyseme_candidate_instead_whole from the cleaned polyseme table.",
+    "final_mono: monoseme rows selected from monoseme_candidate + alt1_word_all + alt2_word_other from the cleaned monoseme table."
+  ),
+  summary_file = SUMMARY_XLSX,
+  hom_example_file = HOM_EXAMPLE_FILE,
+  poly_example_file = POLY_EXAMPLE_FILE,
+  mono_example_file = MONO_EXAMPLE_FILE,
+  n_final_homo_words = length(hom_words),
+  n_final_poly_words = length(poly_words),
+  n_final_mono_words = length(mono_words)
+))
+
+saveWorkbook(wb, OUT_XLSX, overwrite = TRUE)
+message("Final selected-word workbook written: ", OUT_XLSX)
+```
+
+Expected output:
+- `CHANGE_THIS_TO_YOUR_PATH/08_final_all_words_select/final_all_words_selected.xlsx`
+
