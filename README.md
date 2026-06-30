@@ -2,8 +2,16 @@
 <img width="1491" height="1055" alt="257d023f-4e4e-44e3-b08b-2065f275a9c7" src="https://github.com/user-attachments/assets/fb7de3c1-dd91-4c37-9363-30f9aac11e77" />
 
 
-The MHPM database is an open Mandarin Chinese lexical ambiguity resource covering homonym, polyseme, and monoseme candidate words extracted and validated from Xiandai Hanyu Cidian, 7th edition.
+[![DOI](https://zenodo.org/badge/1273140936.svg)](https://doi.org/10.5281/zenodo.21062210)
 
+## Citation
+
+If you use this database, please cite:
+
+Wang, W., Xie, C., & Ma, M. K.-H. (2026). MHPM Mandarin Chinese Homonym-Polyseme-Monoseme Database (v1.0.0). Zenodo. https://doi.org/10.5281/zenodo.21062211
+
+
+The MHPM database is an open Mandarin Chinese lexical ambiguity resource covering homonym, polyseme, and monoseme candidate words extracted and validated from Xiandai Hanyu Cidian, 7th edition.
 MHPM 数据库是一个开放型的汉语普通话词汇歧义数据集，涵盖了从《现代汉语词典》（第7版）中提取并经严格筛选和检验后的汉语普通话同形异义词、多义词及单义词三大类词语。
 
 Lexical ambiguity in Mandarin Chinese has long been an important topic in linguistics, psycholinguistics, and cognitive neuroscience research. A single written sinogram can be associated with multiple meanings, and different forms of lexical ambiguity raise important questions about how native speakers access, select, and represent word meaning in context. In this preprocessing pipeline, the distinction was operationalized using the entry and sense structure of **Xiandai Hanyu Cidian, 7th edition** 《现代汉语词典 第7版》: homonyms refer to words that share the same written form but have distinct, generally unrelated meanings, whereas polysemes refer to words with the same written form multiple semantically related senses. This operational distinction follows the theoretical contrast between homonymy and polysemy, and the actual dataset construction relies on the dictionary's entry/sense organization rather than manual semantic-relatedness judgments alone. 
