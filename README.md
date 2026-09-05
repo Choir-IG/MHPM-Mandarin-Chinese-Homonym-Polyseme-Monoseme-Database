@@ -1,4 +1,4 @@
-# MHPM-Mandarin-Chinese-Homonym-Polyseme-Monoseme-Database
+# MHPM: A Mandarin Chinese Homonym, Polyseme, and Monoseme Database
 <img width="1491" height="1055" alt="257d023f-4e4e-44e3-b08b-2065f275a9c7" src="https://github.com/user-attachments/assets/fb7de3c1-dd91-4c37-9363-30f9aac11e77" />
 
 
